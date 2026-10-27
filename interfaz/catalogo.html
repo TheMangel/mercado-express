@@ -1,0 +1,698 @@
+<!doctype html>
+<html lang="es" data-tema="oscuro">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mercado Express · Administración del catálogo</title>
+<script>try{var c=JSON.parse(localStorage.getItem("me_config")||"{}");document.documentElement.dataset.tema=c.tema==="claro"?"claro":"oscuro"}catch(e){}</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@600;700;800&family=DM+Sans:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  color-scheme:dark;
+  --suave:cubic-bezier(.22,1,.36,1); --resorte:cubic-bezier(.34,1.45,.64,1);
+  --fondo:#0A0910;
+  --vidrio:rgba(255,255,255,.07); --vidrio-2:rgba(255,255,255,.125); --borde:rgba(255,255,255,.18); --linea:rgba(255,255,255,.13);
+  --brillo:rgba(255,255,255,.38);
+  --cristal:linear-gradient(155deg,rgba(255,255,255,.17),rgba(255,255,255,.035) 52%,rgba(255,255,255,.075));
+  --sombra:0 22px 60px rgba(0,0,0,.36); --chica:0 0 0 rgba(0,0,0,0); --desenfoque:blur(30px) saturate(185%);
+  --txt:#F6F3F8; --muted:#B9B1C0; --naranja:#FF7A2F; --precio:#CDEFA0; --aviso:#FF9E7A; --ok:#8FE3B0;
+  --btn-bg:#fff; --btn-txt:#17131B; --inv:#17131B; --opcion:#1d1825;
+  --orbe-1:rgba(255,122,47,.55); --orbe-2:rgba(122,92,255,.5); --orbe-3:rgba(39,196,184,.38);
+  --flecha:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' fill='none' stroke='%23F6F3F8' stroke-width='2'%3E%3Cpath d='m3 5 4 4 4-4'/%3E%3C/svg%3E");
+  --display:"Syne","DM Sans",system-ui,sans-serif; --texto:"DM Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+}
+[data-tema=claro]{
+  color-scheme:light;
+  --fondo:#EDEFF6;
+  --vidrio:rgba(255,255,255,.40); --vidrio-2:rgba(255,255,255,.74); --borde:rgba(255,255,255,.9); --linea:rgba(40,30,70,.13);
+  --brillo:rgba(255,255,255,1);
+  --cristal:linear-gradient(155deg,rgba(255,255,255,.58),rgba(255,255,255,.16) 58%,rgba(255,255,255,.34));
+  --sombra:0 16px 44px rgba(70,60,110,.17),0 0 0 1px rgba(60,50,100,.07);
+  --chica:0 2px 12px rgba(70,60,110,.11),0 0 0 1px rgba(60,50,100,.06);
+  --txt:#1B1720; --muted:#5E5867; --precio:#2F6B1F; --aviso:#B3361F; --ok:#1F6B3A;
+  --btn-bg:#1B1720; --btn-txt:#fff; --inv:#fff; --opcion:#fff;
+  --orbe-1:rgba(255,130,70,.66); --orbe-2:rgba(125,105,255,.52); --orbe-3:rgba(50,205,190,.52);
+  --flecha:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' fill='none' stroke='%231B1720' stroke-width='2'%3E%3Cpath d='m3 5 4 4 4-4'/%3E%3C/svg%3E");
+}
+*{box-sizing:border-box}
+body{margin:0;color:var(--txt);font-family:var(--texto);line-height:1.5;-webkit-font-smoothing:antialiased;min-height:100vh;background:var(--fondo)}
+h1,h2,h3{font-family:var(--display);margin:0;line-height:1.12}
+p{margin:0}
+button,input,select{font:inherit;color:inherit}
+button{cursor:pointer}
+a{color:inherit;text-decoration:none}
+:focus-visible{outline:3px solid var(--naranja);outline-offset:3px;border-radius:10px}
+[hidden]{display:none!important}
+.muted{color:var(--muted);font-size:.88rem}
+.num{font-variant-numeric:tabular-nums}
+
+.aurora{position:fixed;inset:0;overflow:hidden;z-index:0;pointer-events:none}
+.aurora i{position:absolute;border-radius:50%}
+.aurora i:nth-child(1){width:60vmax;height:60vmax;left:-18vmax;top:-22vmax;background:radial-gradient(closest-side,var(--orbe-1),transparent);animation:flota1 46s ease-in-out infinite alternate}
+.aurora i:nth-child(2){width:56vmax;height:56vmax;right:-20vmax;top:6vh;background:radial-gradient(closest-side,var(--orbe-2),transparent);animation:flota2 58s ease-in-out infinite alternate}
+.aurora i:nth-child(3){width:52vmax;height:52vmax;left:22vw;bottom:-30vmax;background:radial-gradient(closest-side,var(--orbe-3),transparent);animation:flota3 64s ease-in-out infinite alternate}
+@keyframes flota1{to{transform:translate3d(16vmax,10vmax,0) scale(1.12)}}
+@keyframes flota2{to{transform:translate3d(-14vmax,12vmax,0) scale(1.1)}}
+@keyframes flota3{to{transform:translate3d(-12vmax,-8vmax,0) scale(1.15)}}
+@keyframes subir{from{opacity:0;transform:translateY(22px) scale(.985)}to{opacity:1;transform:none}}
+
+.envoltura{position:relative;z-index:1;max-width:1240px;margin:0 auto;padding:20px 20px 40px;display:grid;gap:20px}
+.envoltura>*{animation:subir .9s var(--suave) backwards}
+.card{background:var(--cristal),var(--vidrio);border:1px solid var(--borde);border-radius:30px;padding:24px;
+  box-shadow:var(--sombra),inset 0 1px 0 var(--brillo);backdrop-filter:var(--desenfoque);-webkit-backdrop-filter:var(--desenfoque)}
+.card h2{font-size:1.2rem;font-weight:600}
+
+/* barra superior */
+.barra{display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:14px 18px;border-radius:999px}
+.marca{display:flex;align-items:center;gap:12px;margin-right:auto;font-family:var(--display);font-weight:700;font-size:1.15rem}
+.etiqueta{font-family:var(--texto);font-size:.78rem;font-weight:700;letter-spacing:.04em;text-transform:uppercase;padding:4px 12px;border-radius:999px;background:var(--naranja);color:#1c0d04}
+.acciones{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.usuario{display:flex;align-items:center;gap:10px}
+.ini{width:34px;height:34px;border-radius:50%;background:var(--naranja);color:#1c0d04;display:grid;place-items:center;font-weight:700}
+.uTxt{display:grid;line-height:1.15;max-width:18ch}.uTxt b{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.uTxt small{color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+/* botones */
+.btn-fantasma,.btn-naranja,.btn-blanco{display:inline-flex;align-items:center;justify-content:center;gap:8px;border-radius:999px;font-weight:600;border:1px solid transparent;
+  transition:transform .45s var(--resorte),box-shadow .45s var(--suave),background .4s var(--suave)}
+.btn-fantasma{background:var(--cristal),var(--vidrio-2);border-color:var(--borde);box-shadow:var(--chica),inset 0 1px 0 var(--brillo);padding:10px 18px;font-weight:500}
+.btn-naranja{background:linear-gradient(180deg,#FF9553,#FF7A2F);color:#1c0d04;padding:13px 24px;box-shadow:0 10px 26px rgba(255,122,47,.38),inset 0 1px 0 rgba(255,255,255,.5)}
+.btn-blanco{background:var(--btn-bg);color:var(--btn-txt);padding:13px 24px;box-shadow:0 8px 20px rgba(0,0,0,.2)}
+.btn-fantasma:hover,.btn-naranja:hover,.btn-blanco:hover{transform:translateY(-2px) scale(1.025)}
+.btn-fantasma:active,.btn-naranja:active,.btn-blanco:active{transform:scale(.965);transition-duration:.15s}
+button:disabled{opacity:.55;cursor:wait;transform:none!important}
+.btn-icono{width:42px;height:42px;padding:0}
+svg.i{width:20px;height:20px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+
+/* formularios */
+.campo{display:grid;gap:6px;margin-bottom:14px}
+.campo label,.etq{font-size:.88rem;font-weight:500}
+.campo input,.campo select{background:var(--vidrio);border:1px solid var(--linea);box-shadow:inset 0 1px 2px rgba(0,0,0,.12);border-radius:16px;padding:12px 16px;color:var(--txt);width:100%;
+  transition:box-shadow .4s var(--suave),border-color .4s var(--suave),background .4s var(--suave)}
+.campo select{appearance:none;background-image:var(--flecha);background-repeat:no-repeat;background-position:right 16px center;padding-right:40px}
+.campo select option{background:var(--opcion);color:var(--txt)}
+.campo input:focus,.campo select:focus{outline:0;border-color:var(--naranja);box-shadow:0 0 0 4px rgba(255,122,47,.28);background:var(--vidrio-2)}
+.campo small{color:var(--muted)}
+.chk-fila{display:flex;gap:10px;align-items:flex-start;font-size:.88rem;color:var(--muted);margin:4px 0 16px}
+.chk-fila input{width:18px;height:18px;margin-top:2px;accent-color:var(--naranja);flex:none}
+.err,.ok{border-radius:16px;padding:10px 14px;margin:0 0 14px;font-size:.9rem}
+.err{background:rgba(255,90,60,.14);color:var(--aviso);border:1px solid rgba(255,120,90,.45)}
+.err ul{margin:4px 0 0;padding-left:18px}
+.ok{background:rgba(70,200,130,.14);color:var(--ok);border:1px solid rgba(90,210,150,.45)}
+.ok a{text-decoration:underline;font-weight:700}
+
+/* pestañas y selectores visuales */
+.pestanas{display:flex;gap:8px;flex-wrap:wrap;margin:14px 0 18px}
+.chip{border:1px solid var(--borde);background:var(--cristal),var(--vidrio-2);box-shadow:inset 0 1px 0 var(--brillo);border-radius:999px;padding:8px 16px;font-weight:500;font-size:.92rem;
+  transition:transform .45s var(--resorte),background .4s var(--suave)}
+.chip:hover{transform:translateY(-1px) scale(1.03)}
+.chip[aria-pressed=true]{background:var(--txt);color:var(--inv);border-color:var(--txt);font-weight:700}
+.picker{display:flex;flex-wrap:wrap;gap:10px}
+.opcion{display:grid;justify-items:center;gap:6px;border:2px solid transparent;border-radius:22px;padding:6px;background:none;font-size:.78rem;color:var(--muted);
+  transition:transform .45s var(--resorte),border-color .3s,background .3s}
+.opcion:hover{transform:translateY(-2px) scale(1.04)}
+.opcion[aria-pressed=true]{border-color:var(--naranja);background:var(--vidrio);color:var(--txt);font-weight:700}
+.opcion .tile{width:58px;height:58px;border-radius:16px}
+
+/* fichas de color con dibujo (las mismas de la tienda) */
+.tile{position:relative;border-radius:20px;display:grid;place-items:center;overflow:hidden;box-shadow:inset 0 1px 0 rgba(255,255,255,.42),inset 0 -10px 24px rgba(0,0,0,.12)}
+.tile svg{width:68%;height:68%;position:relative;z-index:1;filter:drop-shadow(0 6px 10px rgba(0,0,0,.28))}
+.tile::after{content:"";position:absolute;inset:0;background:linear-gradient(160deg,rgba(255,255,255,.34),transparent 46%)}
+.tile.mue{background:linear-gradient(145deg,#E2733A,#74311B)}
+.tile.tec{background:linear-gradient(145deg,#9370B8,#33284C)}
+.tile.ofi{background:linear-gradient(145deg,#DDAB45,#70531F)}
+.tile.nat{background:linear-gradient(145deg,#45C08E,#14533D)}
+.tile.mar{background:linear-gradient(145deg,#52A0EA,#1C3D7C)}
+.g1{fill:rgba(255,255,255,.94)}.g2{fill:rgba(255,255,255,.58)}.g3{fill:#FFD27A}.gd{fill:rgba(20,10,20,.30)}
+.gs{stroke:rgba(255,255,255,.85);stroke-width:6;stroke-linecap:round;stroke-linejoin:round;fill:none}
+.gds{stroke:rgba(20,10,20,.32);stroke-width:3;stroke-linecap:round;fill:none}
+
+/* vistas */
+.acceso{max-width:520px;width:100%;margin:6vh auto 0}
+.acceso h1{font-size:clamp(1.6rem,4vw,2.1rem);margin-bottom:8px}
+.aviso-rol{background:rgba(242,210,75,.14);border:1px solid rgba(242,210,75,.4);border-radius:16px;padding:10px 14px;margin:14px 0 0;font-size:.9rem}
+.resumen{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:16px}
+.cifra{padding:18px 22px}
+.cifra b{display:block;font-family:var(--display);font-size:2rem;line-height:1.1}
+.cifra span{color:var(--muted);font-size:.88rem}
+.cols{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.1fr);gap:20px;align-items:start}
+.col{display:grid;gap:20px}
+.paso-num{display:inline-grid;place-items:center;width:28px;height:28px;border-radius:50%;background:var(--naranja);color:#1c0d04;font-weight:700;font-size:.9rem;margin-right:10px}
+.card>h2{display:flex;align-items:center;margin-bottom:4px}
+.card>.muted{margin-bottom:16px}
+.vista{display:flex;gap:16px;align-items:center;margin-bottom:18px;padding:12px;border-radius:24px;background:var(--vidrio);border:1px solid var(--linea)}
+.vista .tile{width:92px;height:92px;flex:none}
+.vista h3{font-family:var(--texto);font-weight:600;font-size:1rem;overflow-wrap:anywhere}
+.vista .precio{font-family:var(--display);font-weight:700;color:var(--precio);font-size:1.4rem}
+.listas{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:20px;align-items:start}
+.fila-cat{display:flex;gap:14px;align-items:flex-start;padding:12px 0;border-bottom:1px solid var(--linea)}
+.fila-cat:last-child{border-bottom:0}
+.fila-cat .tile{width:56px;height:56px;border-radius:16px;flex:none}
+.fila-cat b{font-family:var(--display);font-size:1.05rem}
+.etiquetas{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
+.etiqueta-sub{font-size:.8rem;padding:3px 10px;border-radius:999px;background:var(--vidrio-2);border:1px solid var(--linea)}
+.fila-prod{display:grid;grid-template-columns:52px minmax(0,1fr) auto;gap:14px;align-items:center;padding:10px 0;border-bottom:1px solid var(--linea)}
+.fila-prod:last-child{border-bottom:0}
+.fila-prod .tile{width:52px;height:52px;border-radius:14px}
+.fila-prod h3{font-family:var(--texto);font-weight:600;font-size:.95rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.fila-prod .precio{font-family:var(--display);font-weight:700;color:var(--precio)}
+.fila-prod a.ver{font-size:.82rem;text-decoration:underline;color:var(--muted)}
+.vacio{padding:26px 8px;text-align:center;color:var(--muted)}
+
+/* gestión de productos */
+.gp-filtros{display:grid;grid-template-columns:2fr 1fr 1fr 1fr;gap:12px;margin-top:14px}
+.gp-fila{display:grid;grid-template-columns:52px minmax(0,1fr) auto;gap:8px 14px;align-items:center;padding:14px 0;border-bottom:1px solid var(--linea)}
+.gp-fila:last-child{border-bottom:0}
+.gp-fila .tile{width:52px;height:52px;border-radius:14px}
+.gp-fila h3{font-family:var(--texto);font-weight:600;font-size:.98rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.gp-fila .precio{font-family:var(--display);font-weight:700;color:var(--precio)}
+.gp-fila.oculto .tile,.gp-fila.oculto h3{opacity:.5}
+.gp-acc{grid-column:2/-1;display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.gp-acc a.ver{font-size:.82rem;text-decoration:underline;color:var(--muted);margin-left:4px}
+.btn-mini{padding:6px 14px;font-size:.84rem}
+.stock{font-size:.88rem;font-weight:700;font-variant-numeric:tabular-nums}
+.stock.poco{color:#F2D24B}.stock.agotado{color:var(--aviso)}
+.fila-stock{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:12px}
+.peligro{color:var(--aviso);border-color:rgba(255,120,90,.45)}
+.badge-oculto{background:rgba(255,158,122,.16);border-color:rgba(255,120,90,.45);color:var(--aviso);font-weight:700}
+.gp-pie{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-top:14px}
+.id{font-variant-numeric:tabular-nums}
+dialog{border:1px solid var(--borde);border-radius:28px;padding:0;background:var(--fondo);color:var(--txt);width:min(520px,94vw);box-shadow:var(--sombra)}
+dialog::backdrop{background:rgba(5,4,10,.62);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px)}
+.dlg{padding:26px;background:var(--cristal),var(--vidrio);border-radius:28px}
+.dlg h2{font-size:1.25rem;margin-bottom:6px}
+.dlg-acc{display:flex;gap:10px;justify-content:flex-end;flex-wrap:wrap;margin-top:6px}
+.btn-peligro{background:linear-gradient(180deg,#FF7A5C,#E2442A);color:#fff;padding:13px 24px;border-radius:999px;font-weight:600;border:1px solid transparent}
+#toast{position:fixed;left:50%;bottom:26px;transform:translate(-50%,36px) scale(.96);z-index:80;background:var(--btn-bg);color:var(--btn-txt);padding:13px 22px;border-radius:999px;
+  font-weight:500;box-shadow:0 16px 40px rgba(0,0,0,.36);opacity:0;pointer-events:none;transition:opacity .5s var(--suave),transform .6s var(--suave);max-width:min(520px,92vw)}
+#toast.ver{opacity:1;transform:translate(-50%,0) scale(1)}
+
+@media (max-width:980px){.cols,.listas{grid-template-columns:1fr}.resumen{grid-template-columns:repeat(2,minmax(0,1fr))}.gp-filtros{grid-template-columns:1fr 1fr}}
+@media (max-width:640px){
+  .envoltura{padding:12px 12px 32px}
+  .barra{border-radius:28px}
+  .card{padding:18px;border-radius:24px}
+  .acciones{width:100%}
+  .gp-filtros{grid-template-columns:1fr}
+  .gp-fila{grid-template-columns:52px minmax(0,1fr)}
+  .gp-fila>div:nth-of-type(2){grid-column:2}
+}
+@media (prefers-reduced-motion:reduce){*,*::before,*::after{transition:none!important;animation:none!important}}
+</style>
+</head>
+<body>
+<div class="aurora" aria-hidden="true"><i></i><i></i><i></i></div>
+
+<div class="envoltura">
+  <header class="barra card">
+    <a class="marca" href="/" aria-label="Ir a la tienda">
+      <svg viewBox="0 0 44 44" width="34" height="34" aria-hidden="true"><rect x="9" y="9" width="26" height="26" rx="7" fill="#FF7A2F" transform="rotate(45 22 22)"/><rect x="16" y="16" width="12" height="12" rx="3" fill="#0E0C0D" transform="rotate(45 22 22)"/></svg>
+      Mercado Express <span class="etiqueta">Administración</span>
+    </a>
+    <nav class="acciones" aria-label="Navegación de administración">
+      <a class="btn-fantasma" href="/">Ver tienda</a>
+      <a class="btn-fantasma" href="/admin">Panel de gestión</a>
+      <button class="btn-fantasma btn-icono" data-accion="tema" id="btnTema" aria-label="Cambiar entre tema oscuro y claro" title="Tema">
+        <svg class="i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8"/><path d="M12 4a8 8 0 0 0 0 16z" fill="currentColor"/></svg></button>
+      <span class="usuario" id="usuario" hidden>
+        <span class="ini" id="uIni" aria-hidden="true"></span>
+        <span class="uTxt"><b id="uNombre"></b><small id="uCorreo"></small></span>
+        <button class="btn-fantasma" data-accion="salir">Cerrar sesión</button>
+      </span>
+    </nav>
+  </header>
+
+  <!-- ===================== acceso de administradores ===================== -->
+  <main id="vistaAcceso" hidden>
+    <section class="card acceso">
+      <h1>Acceso de administradores</h1>
+      <p class="muted">Aquí se crean y administran las categorías y los productos de la tienda (crear, editar, ocultar y eliminar). Solo pueden entrar cuentas de administrador.</p>
+      <div class="aviso-rol" id="avisoRol" hidden></div>
+      <div class="pestanas" role="group" aria-label="Elegir acción">
+        <button class="chip" data-accion="pestana" data-v="entrar" aria-pressed="true">Iniciar sesión</button>
+        <button class="chip" data-accion="pestana" data-v="registro" aria-pressed="false">Crear cuenta de administrador</button>
+      </div>
+
+      <form id="formEntrar" novalidate>
+        <div class="campo"><label for="eCorreo">Correo electrónico</label><input id="eCorreo" type="email" autocomplete="email" maxlength="254"></div>
+        <div class="campo"><label for="eClave">Contraseña</label><input id="eClave" type="password" autocomplete="current-password" maxlength="128"></div>
+        <div class="err" id="eErr" role="alert" hidden></div>
+        <button class="btn-naranja" type="submit" style="width:100%">Entrar</button>
+      </form>
+
+      <form id="formRegistro" novalidate hidden>
+        <div class="campo"><label for="rNombre">Nombre</label><input id="rNombre" type="text" autocomplete="name" maxlength="80"></div>
+        <div class="campo"><label for="rCorreo">Correo electrónico</label><input id="rCorreo" type="email" autocomplete="email" maxlength="254"></div>
+        <div class="campo"><label for="rClave">Contraseña</label><input id="rClave" type="password" autocomplete="new-password" maxlength="128"><small>Mínimo 8 caracteres</small></div>
+        <div class="campo"><label for="rCodigo">Código de administrador</label><input id="rCodigo" type="password" autocomplete="off" maxlength="200">
+          <small>Es la clave de administrador del servidor (<code>ADMIN_KEY</code>). Sin ella no se puede crear una cuenta de administrador.</small></div>
+        <label class="chk-fila"><input id="rAutoriza" type="checkbox"><span>Autorizo el tratamiento de mis datos personales según la Ley 1581 de 2012.</span></label>
+        <div class="err" id="rErr" role="alert" hidden></div>
+        <button class="btn-naranja" type="submit" style="width:100%">Crear cuenta y entrar</button>
+      </form>
+    </section>
+  </main>
+
+  <!-- ===================== panel del catálogo ===================== -->
+  <main id="vistaPanel" hidden style="display:grid;gap:20px">
+    <section class="resumen" aria-label="Resumen del catálogo">
+      <div class="card cifra"><b class="num" id="cCats">–</b><span>Categorías</span></div>
+      <div class="card cifra"><b class="num" id="cSubs">–</b><span>Subcategorías</span></div>
+      <div class="card cifra"><b class="num" id="cProds">–</b><span>Productos en la tienda</span></div>
+      <div class="card cifra"><b class="num" id="cCreados">–</b><span>Creados desde aquí</span></div>
+    </section>
+
+    <section class="cols">
+      <div class="col">
+        <article class="card">
+          <h2><span class="paso-num" aria-hidden="true">1</span>Nueva categoría</h2>
+          <p class="muted">Una categoría agrupa productos (por ejemplo «Deportes»). El color decide cómo se ve en la tienda.</p>
+          <form id="formCat" novalidate>
+            <div class="campo"><label for="cNombre">Nombre</label><input id="cNombre" type="text" maxlength="40" autocomplete="off"></div>
+            <p class="etq" id="etqTono">Color</p>
+            <div class="picker" id="pickTono" role="group" aria-labelledby="etqTono" style="margin:8px 0 16px"></div>
+            <div class="err" id="cErr" role="alert" hidden></div>
+            <button class="btn-naranja" type="submit">Crear categoría</button>
+          </form>
+        </article>
+
+        <article class="card">
+          <h2><span class="paso-num" aria-hidden="true">2</span>Nueva subcategoría</h2>
+          <p class="muted">Cada producto va dentro de una subcategoría (por ejemplo «Balones» dentro de «Deportes»).</p>
+          <form id="formSub" novalidate>
+            <div class="campo"><label for="sCat">Categoría</label><select id="sCat"></select></div>
+            <div class="campo"><label for="sNombre">Nombre de la subcategoría</label><input id="sNombre" type="text" maxlength="40" autocomplete="off"></div>
+            <p class="etq" id="etqIcono">Dibujo</p>
+            <div class="picker" id="pickIcono" role="group" aria-labelledby="etqIcono" style="margin:8px 0 16px"></div>
+            <div class="err" id="sErr" role="alert" hidden></div>
+            <button class="btn-naranja" type="submit">Crear subcategoría</button>
+          </form>
+        </article>
+      </div>
+
+      <article class="card">
+        <h2><span class="paso-num" aria-hidden="true">3</span>Nuevo producto</h2>
+        <p class="muted">Aparece en la tienda apenas se guarda. El código del producto se genera solo.</p>
+        <div class="vista" aria-live="polite"><div id="vistaTile"></div><div style="min-width:0"><h3 id="vistaNombre">Nombre del producto</h3><p class="muted" id="vistaCat"></p><p class="precio num" id="vistaPrecio"></p></div></div>
+        <form id="formProd" novalidate>
+          <div class="campo"><label for="pNombre">Nombre del producto</label><input id="pNombre" type="text" maxlength="200" autocomplete="off"></div>
+          <div class="campo"><label for="pCat">Categoría</label><select id="pCat"></select></div>
+          <div class="campo"><label for="pSub">Subcategoría</label><select id="pSub"></select></div>
+          <div class="campo"><label for="pPrecio">Precio en dólares (USD)</label><input id="pPrecio" type="number" inputmode="decimal" min="0.01" step="0.01" placeholder="0.00"><small>La tienda también lo muestra en pesos (COP) con la tasa del servidor.</small></div>
+          <div class="campo"><label for="pStock">Cantidad en stock (unidades)</label><input id="pStock" type="number" inputmode="numeric" min="0" step="1" placeholder="0"><small>Cuántas unidades tienes disponibles ahora. Después podrás agregar o quitar desde «Editar».</small></div>
+          <div class="err" id="pErr" role="alert" hidden></div>
+          <div class="ok" id="pOk" role="status" hidden></div>
+          <button class="btn-naranja" type="submit">Agregar producto</button>
+        </form>
+      </article>
+    </section>
+
+    <section class="card" id="gestionProductos" aria-labelledby="gpTit">
+      <h2 id="gpTit">Administrar productos</h2>
+      <p class="muted">Edita el nombre, la categoría, el precio o el stock de cualquier producto. «Ocultar» lo quita de la tienda sin borrarlo; «Eliminar» lo borra, salvo que ya tenga ventas (entonces solo se oculta, para no dañar el historial).</p>
+      <div class="gp-filtros">
+        <div class="campo"><label for="gpBusca">Buscar por nombre</label><input id="gpBusca" type="search" maxlength="80" autocomplete="off" placeholder="Ej.: silla"></div>
+        <div class="campo"><label for="gpCat">Categoría</label><select id="gpCat"></select></div>
+        <div class="campo"><label for="gpEstado">Estado</label><select id="gpEstado"><option value="todos">Todos</option><option value="activos">En la tienda</option><option value="ocultos">Ocultos</option></select></div>
+        <div class="campo"><label for="gpOrden">Orden</label><select id="gpOrden"><option value="recientes">Más recientes</option><option value="nombre">Nombre (A–Z)</option><option value="precio_asc">Precio: menor a mayor</option><option value="precio_desc">Precio: mayor a menor</option><option value="vendidos">Más vendidos</option></select></div>
+      </div>
+      <div id="gpLista" aria-live="polite"></div>
+      <div class="gp-pie">
+        <span class="muted" id="gpInfo"></span>
+        <span style="display:flex;gap:8px"><button class="btn-fantasma btn-mini" id="gpAnt" data-accion="pag-ant">← Anterior</button><button class="btn-fantasma btn-mini" id="gpSig" data-accion="pag-sig">Siguiente →</button></span>
+      </div>
+    </section>
+
+    <section class="listas" style="grid-template-columns:1fr">
+      <article class="card"><h2>Categorías de la tienda</h2><div id="listaCats" style="margin-top:8px"></div></article>
+    </section>
+  </main>
+</div>
+<dialog id="dlgEditar" aria-labelledby="edTit">
+  <form id="formEditar" class="dlg" novalidate>
+    <h2 id="edTit">Editar producto</h2>
+    <p class="muted" style="margin-bottom:16px">Código: <span class="id" id="edCodigo"></span></p>
+    <div class="campo"><label for="edNombre">Nombre del producto</label><input id="edNombre" type="text" maxlength="200" autocomplete="off"></div>
+    <div class="campo"><label for="edCat">Categoría</label><select id="edCat"></select></div>
+    <div class="campo"><label for="edSub">Subcategoría</label><select id="edSub"></select></div>
+    <div class="campo"><label for="edPrecio">Precio en dólares (USD)</label><input id="edPrecio" type="number" inputmode="decimal" min="0.01" step="0.01">
+      <small id="edNotaPrecio" hidden>Este producto usa el precio calculado del historial de ventas. Si lo cambias, desde ahora se usa el que escribas.</small></div>
+    <p class="etq" style="margin:2px 0 8px">Stock actual: <b class="num" id="edStockActual"></b> unidades</p>
+    <div class="fila-stock">
+      <div class="campo"><label for="edModo">Acción</label><select id="edModo"><option value="agregar">Agregar unidades</option><option value="quitar">Quitar unidades</option><option value="fijar">Fijar cantidad exacta</option></select></div>
+      <div class="campo"><label for="edCantidad" id="edCantidadEtq">Unidades a agregar</label><input id="edCantidad" type="number" inputmode="numeric" min="0" step="1" placeholder="0"></div>
+    </div>
+    <p class="muted" id="edStockResultado" aria-live="polite" style="margin:-6px 0 14px"></p>
+    <p class="muted" id="edNotaNombre" hidden style="margin-bottom:14px">Este producto ya tiene ventas: si cambias el nombre, también se actualiza en los pedidos ya registrados.</p>
+    <div class="err" id="edErr" role="alert" hidden></div>
+    <div class="dlg-acc"><button type="button" class="btn-fantasma" data-accion="dlg-cerrar">Cancelar</button><button type="submit" class="btn-naranja">Guardar cambios</button></div>
+  </form>
+</dialog>
+
+<dialog id="dlgBorrar" aria-labelledby="brTit">
+  <div class="dlg">
+    <h2 id="brTit">Eliminar producto</h2>
+    <p id="brTexto" style="margin:8px 0 18px"></p>
+    <div class="err" id="brErr" role="alert" hidden></div>
+    <div class="dlg-acc"><button type="button" class="btn-fantasma" data-accion="dlg-cerrar">Cancelar</button><button type="button" class="btn-peligro" id="brOk" data-accion="prod-confirmar-borrar">Eliminar</button></div>
+  </div>
+</dialog>
+<div id="toast" role="status" aria-live="polite"></div>
+
+<script>
+"use strict";
+const $ = (s, r = document) => r.querySelector(s);
+const $$ = (s, r = document) => [...r.querySelectorAll(s)];
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+
+/* ---------- dibujos y colores (los mismos que usa la tienda) ---------- */
+const GLIFOS = {
+  chair:  '<rect x="30" y="10" width="40" height="38" rx="9" class="g1"/><rect x="22" y="50" width="56" height="13" rx="6.5" class="g2"/><path d="M50 63v17M28 90l22-10 22 10" class="gs"/>',
+  shelf:  '<rect x="20" y="8" width="60" height="84" rx="6" class="g1"/><rect x="26" y="14" width="48" height="23" rx="2" class="gd"/><rect x="26" y="41" width="48" height="23" rx="2" class="gd"/><rect x="26" y="68" width="48" height="18" rx="2" class="gd"/><rect x="31" y="18" width="7" height="19" rx="1.5" class="g3"/><rect x="41" y="22" width="7" height="15" rx="1.5" class="g2"/><rect x="52" y="45" width="16" height="19" rx="2" class="g3"/>',
+  table:  '<rect x="10" y="32" width="80" height="12" rx="6" class="g1"/><rect x="20" y="44" width="9" height="40" rx="3" class="g2"/><rect x="71" y="44" width="9" height="40" rx="3" class="g2"/><rect x="36" y="44" width="28" height="6" rx="3" class="g3"/>',
+  lamp:   '<path d="M32 18h36l9 34H23z" class="g1"/><rect x="46.5" y="52" width="7" height="28" rx="3" class="g2"/><ellipse cx="50" cy="84" rx="20" ry="6" class="g2"/>',
+  phone:  '<rect x="30" y="8" width="40" height="84" rx="9" class="g1"/><rect x="35" y="16" width="30" height="62" rx="4" class="gd"/><rect x="39" y="22" width="9" height="9" rx="2.5" class="g3"/><rect x="52" y="22" width="9" height="9" rx="2.5" class="g2"/><rect x="39" y="35" width="22" height="5" rx="2.5" class="g2"/><circle cx="50" cy="85" r="3.2" class="gd"/>',
+  mouse:  '<rect x="32" y="14" width="36" height="66" rx="18" class="g1"/><path d="M50 14v28M32 42h36" class="gds"/><rect x="46.5" y="22" width="7" height="12" rx="3.5" class="g3"/><path d="M50 80c0 8-8 8-8 14" class="gs" style="stroke-width:3"/>',
+  printer:'<rect x="30" y="12" width="40" height="26" rx="3" class="g2"/><rect x="12" y="36" width="76" height="34" rx="8" class="g1"/><rect x="26" y="62" width="48" height="26" rx="3" class="g2"/><circle cx="76" cy="47" r="3.4" class="g3"/><rect x="20" y="45" width="28" height="4" rx="2" class="gd"/>',
+  binder: '<rect x="27" y="8" width="46" height="84" rx="6" class="g1"/><circle cx="27" cy="26" r="5.5" class="g2"/><circle cx="27" cy="50" r="5.5" class="g2"/><circle cx="27" cy="74" r="5.5" class="g2"/><rect x="38" y="34" width="26" height="22" rx="3" class="g3"/><rect x="38" y="62" width="26" height="4" rx="2" class="gd"/>',
+  box:    '<rect x="12" y="24" width="76" height="16" rx="5" class="g2"/><rect x="18" y="40" width="64" height="48" rx="6" class="g1"/><rect x="39" y="52" width="22" height="9" rx="4.5" class="g3"/>'
+};
+const NOMBRE_ICONO = {chair: "Silla", shelf: "Estante", table: "Mesa", lamp: "Lámpara", phone: "Teléfono", mouse: "Accesorio", printer: "Máquina", binder: "Carpeta", box: "Caja"};
+const NOMBRE_TONO = {mue: "Naranja", tec: "Violeta", ofi: "Ámbar", nat: "Verde", mar: "Azul"};
+const tile = (tono, icono, extra = "") => `<div class="tile ${esc(tono)} ${extra}"><svg viewBox="0 0 100 100" aria-hidden="true">${GLIFOS[icono] || GLIFOS.box}</svg></div>`;
+const usd = n => "US$ " + Number(n).toLocaleString("es-CO", {minimumFractionDigits: 2, maximumFractionDigits: 2});
+
+/* ---------- comunicación con la API (la sesión viaja en una cookie HttpOnly) ---------- */
+async function api(ruta, metodo = "GET", cuerpo) {
+  try {
+    const r = await fetch(ruta, {method: metodo, headers: {"Content-Type": "application/json"}, body: cuerpo ? JSON.stringify(cuerpo) : undefined});
+    let datos = null; try { datos = await r.json(); } catch (e) {}
+    return {ok: r.ok, status: r.status, datos};
+  } catch (e) { return {ok: false, status: 0, datos: null}; }
+}
+function mostrarError(el, r, texto401) {
+  const d = r.datos || {};
+  const msg = r.status === 0 ? "No se pudo conectar con el servidor." : r.status === 401 && texto401 ? texto401 : (d.error || "No se pudo completar la acción.");
+  el.hidden = false;
+  el.innerHTML = esc(msg) + (Array.isArray(d.detalles) && d.detalles.length ? `<ul>${d.detalles.map(x => `<li>${esc(x)}</li>`).join("")}</ul>` : "");
+}
+let tToast;
+function aviso(txt) { const el = $("#toast"); el.textContent = txt; el.classList.add("ver"); clearTimeout(tToast); tToast = setTimeout(() => el.classList.remove("ver"), 2800); }
+
+/* ---------- estado ---------- */
+let ARBOL = [], TONO = "ofi", ICONO = "box";
+const catDe = nombre => ARBOL.find(c => c.categoria === nombre);
+
+/* ---------- vistas ---------- */
+function mostrarAcceso(cuentaCliente) {
+  $("#vistaPanel").hidden = true; $("#vistaAcceso").hidden = false; $("#usuario").hidden = true;
+  const av = $("#avisoRol");
+  av.hidden = !cuentaCliente;
+  if (cuentaCliente) av.textContent = `Tu sesión actual (${cuentaCliente.email}) es de una cuenta de cliente. Para entrar aquí inicia sesión con una cuenta de administrador.`;
+}
+function mostrarPanel(cuenta) {
+  $("#vistaAcceso").hidden = true; $("#vistaPanel").hidden = false; $("#usuario").hidden = false;
+  $("#uIni").textContent = cuenta.nombre.charAt(0).toUpperCase();
+  $("#uNombre").textContent = cuenta.nombre; $("#uCorreo").textContent = cuenta.email;
+  cargarDatos();
+}
+async function cargarDatos() {
+  const r = await api("/admin/catalogo/datos");
+  if (r.status === 401 || r.status === 403) { mostrarAcceso(); return; }
+  if (!r.ok) { aviso("No se pudieron cargar los datos del catálogo."); return; }
+  ARBOL = r.datos.arbol;
+  const t = r.datos.totales;
+  $("#cCats").textContent = t.categorias; $("#cSubs").textContent = t.subcategorias;
+  $("#cProds").textContent = t.productos.toLocaleString("es-CO"); $("#cCreados").textContent = t.creados;
+  llenarSelects(); pintarPickers(); pintarVista(); pintarListas(); await cargarProductos();
+}
+
+/* ---------- selectores (conservan lo elegido al refrescar) ---------- */
+function llenarSelects() {
+  const nombres = ARBOL.map(c => c.categoria);
+  for (const id of ["sCat", "pCat"]) {
+    const el = $("#" + id), previo = el.value;
+    el.innerHTML = nombres.map(n => `<option value="${esc(n)}">${esc(n)}</option>`).join("");
+    if (nombres.includes(previo)) el.value = previo;
+  }
+  const f = $("#gpCat"), previoF = f.value;
+  f.innerHTML = `<option value="">Todas</option>` + nombres.map(n => `<option value="${esc(n)}">${esc(n)}</option>`).join("");
+  if (nombres.includes(previoF)) f.value = previoF;
+  llenarSubs();
+}
+function llenarSubs() {
+  const el = $("#pSub"), previo = el.value, subs = (catDe($("#pCat").value)?.subcategorias || []).map(s => s.nombre);
+  el.innerHTML = subs.length ? subs.map(n => `<option value="${esc(n)}">${esc(n)}</option>`).join("") : `<option value="">(esta categoría aún no tiene subcategorías)</option>`;
+  if (subs.includes(previo)) el.value = previo;
+}
+function pintarPickers() {
+  $("#pickTono").innerHTML = Object.keys(NOMBRE_TONO).map(t =>
+    `<button type="button" class="opcion" data-accion="tono" data-v="${t}" aria-pressed="${TONO === t}">${tile(t, "box")}<span>${NOMBRE_TONO[t]}</span></button>`).join("");
+  const tono = catDe($("#sCat").value)?.tono || "ofi";
+  $("#pickIcono").innerHTML = Object.keys(NOMBRE_ICONO).map(i =>
+    `<button type="button" class="opcion" data-accion="icono" data-v="${i}" aria-pressed="${ICONO === i}">${tile(tono, i)}<span>${NOMBRE_ICONO[i]}</span></button>`).join("");
+}
+function pintarVista() {
+  const cat = catDe($("#pCat").value), sub = cat?.subcategorias.find(s => s.nombre === $("#pSub").value);
+  $("#vistaTile").innerHTML = tile(cat?.tono || "ofi", sub?.icono || "box");
+  $("#vistaNombre").textContent = $("#pNombre").value.trim() || "Nombre del producto";
+  $("#vistaCat").textContent = cat ? `${$("#pSub").value || "—"} · ${cat.categoria}` : "";
+  const p = parseFloat($("#pPrecio").value);
+  $("#vistaPrecio").textContent = p > 0 ? usd(p) : "";
+}
+function pintarListas() {
+  $("#listaCats").innerHTML = ARBOL.map(c => `<div class="fila-cat">${tile(c.tono, c.subcategorias[0]?.icono || "box")}
+      <div style="min-width:0"><b>${esc(c.categoria)}</b> <span class="muted">· ${c.productos.toLocaleString("es-CO")} ${c.productos === 1 ? "producto" : "productos"}</span>
+      <div class="etiquetas">${c.subcategorias.length ? c.subcategorias.map(s => `<span class="etiqueta-sub">${esc(s.nombre)} · ${s.productos}</span>`).join("") : `<span class="muted">Sin subcategorías todavía</span>`}</div></div></div>`).join("");
+}
+
+/* ---------- administrar productos: listar, editar, ocultar y eliminar ---------- */
+const GP = {q: "", categoria: "", estado: "todos", orden: "recientes", pagina: 1, limite: 8, total: 0, items: []};
+const rutaProd = p => `/admin/catalogo/productos/${encodeURIComponent(p.product_id)}?nombre_actual=${encodeURIComponent(p.nombre)}`;
+let PROD = null;   // producto abierto en un diálogo
+
+async function llamarAdmin(ruta, metodo, cuerpo) {      // si la sesión terminó, vuelve al acceso
+  const r = await api(ruta, metodo, cuerpo);
+  if (r.status === 401 || r.status === 403) { $$("dialog[open]").forEach(d => d.close()); aviso("Tu sesión terminó. Inicia sesión de nuevo."); mostrarAcceso(); }
+  return r;
+}
+async function cargarProductos() {
+  const q = new URLSearchParams({pagina: GP.pagina, limite: GP.limite, estado: GP.estado, orden: GP.orden});
+  if (GP.q) q.set("q", GP.q);
+  if (GP.categoria) q.set("categoria", GP.categoria);
+  const r = await llamarAdmin("/admin/catalogo/productos?" + q);
+  if (r.status === 401 || r.status === 403) return;
+  if (!r.ok) { aviso("No se pudo cargar la lista de productos."); return; }
+  const paginas = Math.max(1, Math.ceil(r.datos.total / GP.limite));
+  if (GP.pagina > paginas) { GP.pagina = paginas; return cargarProductos(); }   // p. ej. al borrar el último de la página
+  GP.total = r.datos.total; GP.items = r.datos.resultados;
+  pintarProductos(paginas);
+}
+function pintarProductos(paginas) {
+  $("#gpLista").innerHTML = GP.items.length ? GP.items.map((p, i) => `<div class="gp-fila${p.activo ? "" : " oculto"}">${tile(p.tono || "ofi", p.icono || "box")}
+      <div style="min-width:0"><h3 title="${esc(p.nombre)}">${esc(p.nombre)}</h3>
+        <p class="muted">${esc(p.subcategoria)} · ${esc(p.categoria)} · <span class="id">${esc(p.product_id)}</span></p>
+        ${p.activo ? "" : `<span class="etiqueta-sub badge-oculto">Oculto en la tienda</span>`}</div>
+      <div style="text-align:right"><div class="precio num">${usd(p.precio)}</div><p class="muted">${p.vendidos.toLocaleString("es-CO")} vendidos${p.precio_propio ? "" : " · precio del historial"}</p>
+        <p class="stock ${p.stock === 0 ? "agotado" : p.stock <= 5 ? "poco" : ""}">${p.stock === 0 ? "Agotado" : `Stock: ${p.stock.toLocaleString("es-CO")}`}</p></div>
+      <div class="gp-acc">
+        <button class="btn-fantasma btn-mini" data-accion="prod-editar" data-i="${i}">Editar</button>
+        <button class="btn-fantasma btn-mini" data-accion="prod-alternar" data-i="${i}">${p.activo ? "Ocultar" : "Mostrar"}</button>
+        <button class="btn-fantasma btn-mini peligro" data-accion="prod-borrar" data-i="${i}">Eliminar</button>
+        ${p.activo ? `<a class="ver" href="/?q=${encodeURIComponent(p.nombre)}">Ver en la tienda</a>` : ""}
+      </div></div>`).join("")
+    : `<div class="vacio">No hay productos que coincidan con la búsqueda.</div>`;
+  $("#gpInfo").textContent = `${GP.total.toLocaleString("es-CO")} ${GP.total === 1 ? "producto" : "productos"} · página ${GP.pagina} de ${paginas}`;
+  $("#gpAnt").disabled = GP.pagina <= 1; $("#gpSig").disabled = GP.pagina >= paginas;
+}
+function llenarSubsEditar(elegida) {
+  const subs = (catDe($("#edCat").value)?.subcategorias || []).map(x => x.nombre);
+  $("#edSub").innerHTML = subs.length ? subs.map(n => `<option value="${esc(n)}">${esc(n)}</option>`).join("") : `<option value="">(esta categoría aún no tiene subcategorías)</option>`;
+  if (elegida && subs.includes(elegida)) $("#edSub").value = elegida;
+}
+function abrirEditar(p) {
+  PROD = p; $("#edErr").hidden = true;
+  $("#edCodigo").textContent = p.product_id; $("#edNombre").value = p.nombre; $("#edPrecio").value = Number(p.precio).toFixed(2);
+  $("#edCat").innerHTML = ARBOL.map(c => `<option value="${esc(c.categoria)}">${esc(c.categoria)}</option>`).join("");
+  $("#edCat").value = p.categoria; llenarSubsEditar(p.subcategoria);
+  $("#edNotaPrecio").hidden = p.precio_propio; $("#edNotaNombre").hidden = !p.con_ventas;
+  $("#edStockActual").textContent = p.stock.toLocaleString("es-CO"); $("#edModo").value = "agregar"; $("#edCantidad").value = ""; pintarStockEditar();
+  $("#dlgEditar").showModal(); $("#edNombre").focus();
+}
+function abrirBorrar(p) {
+  PROD = p; $("#brErr").hidden = true;
+  $("#brTexto").innerHTML = p.con_ventas
+    ? `«<b>${esc(p.nombre)}</b>» ya tiene ${p.vendidos.toLocaleString("es-CO")} unidades vendidas, así que no se puede borrar sin dañar el historial de pedidos. <b>Se ocultará de la tienda</b> y podrás volver a mostrarlo cuando quieras.`
+    : `Se va a eliminar «<b>${esc(p.nombre)}</b>» para siempre. Esta acción no se puede deshacer.`;
+  $("#brOk").textContent = p.con_ventas ? "Ocultar de la tienda" : "Eliminar";
+  $("#dlgBorrar").showModal();
+}
+$("#edCat").addEventListener("change", () => llenarSubsEditar());
+/* Stock en el diálogo: agregar, quitar o fijar; muestra cómo quedaría antes de guardar */
+function cambioStock() {      // -> {error} | {ajuste} | {fijo} | {} (sin cambio)
+  const modo = $("#edModo").value, texto = $("#edCantidad").value.trim(), n = Number(texto);
+  if (texto === "") return {};
+  if (!Number.isInteger(n) || n < 0) return {error: "La cantidad debe ser un número entero, 0 o más."};
+  if (modo === "fijar") return n === PROD.stock ? {} : {fijo: n};
+  if (n === 0) return {};
+  if (modo === "quitar") return n > PROD.stock ? {error: `No puedes quitar ${n.toLocaleString("es-CO")}: solo hay ${PROD.stock.toLocaleString("es-CO")} en stock.`} : {ajuste: -n};
+  return {ajuste: n};
+}
+function pintarStockEditar() {
+  const modo = $("#edModo").value, c = cambioStock(), el = $("#edStockResultado");
+  $("#edCantidadEtq").textContent = modo === "agregar" ? "Unidades a agregar" : modo === "quitar" ? "Unidades a quitar" : "Nueva cantidad total";
+  el.style.color = c.error ? "var(--aviso)" : "";
+  if (c.error) el.textContent = c.error;
+  else if (c.ajuste !== undefined || c.fijo !== undefined) { const d = c.fijo ?? PROD.stock + c.ajuste; el.textContent = `Quedará en ${d.toLocaleString("es-CO")} ${d === 1 ? "unidad" : "unidades"}.`; }
+  else el.textContent = "";
+}
+$("#edModo").addEventListener("change", pintarStockEditar);
+$("#edCantidad").addEventListener("input", pintarStockEditar);
+$("#formEditar").addEventListener("submit", async e => {
+  e.preventDefault();
+  const err = $("#edErr"); err.hidden = true;
+  const nombre = $("#edNombre").value.trim(), categoria = $("#edCat").value, subcategoria = $("#edSub").value, precio = parseFloat($("#edPrecio").value);
+  if (!(precio > 0)) { err.hidden = false; err.textContent = "Escribe un precio mayor que 0."; return; }
+  const cambios = {};        // solo se envía lo que cambió (así un precio calculado no se "congela" sin querer)
+  if (nombre !== PROD.nombre) cambios.nombre = nombre;
+  if (categoria !== PROD.categoria || subcategoria !== PROD.subcategoria) { cambios.categoria = categoria; cambios.subcategoria = subcategoria; }
+  if (Math.abs(precio - PROD.precio) > 0.004) cambios.precio = precio;
+  const st = cambioStock();
+  if (st.error) { err.hidden = false; err.textContent = st.error; return; }
+  if (st.ajuste !== undefined) cambios.ajuste_stock = st.ajuste;      // suma o resta sobre lo que haya en la base
+  if (st.fijo !== undefined) cambios.stock = st.fijo;
+  if (!Object.keys(cambios).length) { $("#dlgEditar").close(); aviso("No hay cambios que guardar"); return; }
+  const btn = e.target.querySelector("button[type=submit]"); btn.disabled = true;
+  const r = await llamarAdmin(rutaProd(PROD), "PUT", cambios);
+  btn.disabled = false;
+  if (r.status === 401 || r.status === 403) return;
+  if (!r.ok) return mostrarError(err, r);
+  $("#dlgEditar").close(); aviso(`«${r.datos.nombre}» actualizado`); await cargarDatos();
+});
+async function alternarProducto(p) {
+  const r = await llamarAdmin(rutaProd(p), "PUT", {activo: !p.activo});
+  if (r.status === 401 || r.status === 403) return;
+  if (!r.ok) { aviso((r.datos && r.datos.error) || "No se pudo cambiar el estado."); return; }
+  aviso(r.datos.activo ? `«${p.nombre}» vuelve a estar en la tienda` : `«${p.nombre}» quedó oculto en la tienda`); await cargarDatos();
+}
+async function confirmarBorrar() {
+  const btn = $("#brOk"); btn.disabled = true;
+  const r = await llamarAdmin(rutaProd(PROD), "DELETE");
+  btn.disabled = false;
+  if (r.status === 401 || r.status === 403) return;
+  if (!r.ok) return mostrarError($("#brErr"), r);
+  $("#dlgBorrar").close(); aviso(r.datos.mensaje); await cargarDatos();
+}
+let tBusca;
+$("#gpBusca").addEventListener("input", e => { clearTimeout(tBusca); tBusca = setTimeout(() => { GP.q = e.target.value.trim(); GP.pagina = 1; cargarProductos(); }, 300); });
+for (const [id, campo] of [["gpCat", "categoria"], ["gpEstado", "estado"], ["gpOrden", "orden"]])
+  $("#" + id).addEventListener("change", e => { GP[campo] = e.target.value; GP.pagina = 1; cargarProductos(); });
+
+/* ---------- eventos ---------- */
+function cambiarPestana(v) {
+  $("#formEntrar").hidden = v !== "entrar"; $("#formRegistro").hidden = v !== "registro";
+  $$("[data-accion=pestana]").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.v === v)));
+}
+document.addEventListener("click", async e => {
+  const b = e.target.closest("[data-accion]"); if (!b) return;
+  switch (b.dataset.accion) {
+    case "pestana": cambiarPestana(b.dataset.v); break;
+    case "tono": TONO = b.dataset.v; pintarPickers(); break;
+    case "icono": ICONO = b.dataset.v; pintarPickers(); break;
+    case "pag-ant": GP.pagina = Math.max(1, GP.pagina - 1); cargarProductos(); break;
+    case "pag-sig": GP.pagina += 1; cargarProductos(); break;
+    case "prod-editar": abrirEditar(GP.items[+b.dataset.i]); break;
+    case "prod-alternar": alternarProducto(GP.items[+b.dataset.i]); break;
+    case "prod-borrar": abrirBorrar(GP.items[+b.dataset.i]); break;
+    case "prod-confirmar-borrar": confirmarBorrar(); break;
+    case "dlg-cerrar": b.closest("dialog").close(); break;
+    case "salir": await api("/cuenta/salir", "POST"); ARBOL = []; mostrarAcceso(); aviso("Sesión cerrada"); break;
+    case "tema": {
+      let c = {}; try { c = JSON.parse(localStorage.getItem("me_config") || "{}"); } catch (x) {}
+      c.tema = document.documentElement.dataset.tema === "claro" ? "oscuro" : "claro";
+      try { localStorage.setItem("me_config", JSON.stringify(c)); } catch (x) {}
+      const aplicar = () => { document.documentElement.dataset.tema = c.tema; };
+      if (document.startViewTransition && !matchMedia("(prefers-reduced-motion: reduce)").matches) document.startViewTransition(aplicar); else aplicar();
+    }
+  }
+});
+$("#sCat").addEventListener("change", pintarPickers);
+$("#pCat").addEventListener("change", () => { llenarSubs(); pintarVista(); });
+for (const id of ["pSub", "pNombre", "pPrecio"]) $("#" + id).addEventListener("input", pintarVista);
+
+/* acceso */
+async function enviarAcceso(form, ruta, cuerpo, errEl, texto401) {
+  const btn = form.querySelector("button[type=submit]"); btn.disabled = true; errEl.hidden = true;
+  const r = await api(ruta, "POST", cuerpo);
+  btn.disabled = false;
+  if (!r.ok) return mostrarError(errEl, r, texto401);
+  form.reset(); mostrarPanel(r.datos); aviso(`Bienvenido, ${r.datos.nombre.split(" ")[0]}`);
+}
+$("#formEntrar").addEventListener("submit", e => {
+  e.preventDefault();
+  const email = $("#eCorreo").value.trim(), password = $("#eClave").value;
+  if (!email || !password) { const el = $("#eErr"); el.hidden = false; el.textContent = "Escribe tu correo y tu contraseña."; return; }
+  enviarAcceso(e.target, "/admin/entrar", {email, password}, $("#eErr"), "Correo o contraseña incorrectos, o la cuenta no es de administrador.");
+});
+$("#formRegistro").addEventListener("submit", e => {
+  e.preventDefault();
+  const el = $("#rErr"), nombre = $("#rNombre").value.trim(), email = $("#rCorreo").value.trim(), password = $("#rClave").value, codigo = $("#rCodigo").value;
+  const falla = t => { el.hidden = false; el.textContent = t; };
+  if (nombre.length < 2) return falla("Escribe tu nombre (mínimo 2 letras).");
+  if (!/^[^@\s]+@[^@\s]+\.[^@\s]{2,}$/.test(email)) return falla("Escribe un correo válido.");
+  if (password.length < 8) return falla("La contraseña debe tener al menos 8 caracteres.");
+  if (!codigo) return falla("Escribe el código de administrador.");
+  if (!$("#rAutoriza").checked) return falla("Debes autorizar el tratamiento de datos para crear la cuenta.");
+  enviarAcceso(e.target, "/admin/registro", {nombre, email, password, codigo, autorizacion_datos: true}, el);
+});
+
+/* crear categoría, subcategoría y producto */
+async function crear(form, ruta, cuerpo, errEl, alExito) {
+  const btn = form.querySelector("button[type=submit]"); btn.disabled = true; errEl.hidden = true;
+  const r = await api(ruta, "POST", cuerpo);
+  btn.disabled = false;
+  if (r.status === 401 || r.status === 403) { aviso("Tu sesión terminó. Inicia sesión de nuevo."); mostrarAcceso(); return; }
+  if (!r.ok) return mostrarError(errEl, r);
+  await alExito(r.datos);
+}
+$("#formCat").addEventListener("submit", e => {
+  e.preventDefault();
+  crear(e.target, "/admin/catalogo/categorias", {nombre: $("#cNombre").value.trim(), tono: TONO}, $("#cErr"), async d => {
+    $("#cNombre").value = ""; await cargarDatos();
+    $("#sCat").value = d.categoria; $("#pCat").value = d.categoria; llenarSubs(); pintarPickers(); pintarVista();
+    aviso(`Categoría «${d.categoria}» creada. Ahora agrégale una subcategoría.`);
+  });
+});
+$("#formSub").addEventListener("submit", e => {
+  e.preventDefault();
+  crear(e.target, "/admin/catalogo/subcategorias", {categoria: $("#sCat").value, nombre: $("#sNombre").value.trim(), icono: ICONO}, $("#sErr"), async d => {
+    $("#sNombre").value = ""; await cargarDatos();
+    $("#pCat").value = d.categoria; llenarSubs(); $("#pSub").value = d.subcategoria; pintarVista();
+    aviso(`Subcategoría «${d.subcategoria}» creada en «${d.categoria}».`);
+  });
+});
+$("#formProd").addEventListener("submit", e => {
+  e.preventDefault();
+  $("#pOk").hidden = true;
+  const precio = parseFloat($("#pPrecio").value), textoStock = $("#pStock").value.trim(), stock = Number(textoStock);
+  const falla = t => { const el = $("#pErr"); el.hidden = false; el.textContent = t; };
+  if (!(precio > 0)) return falla("Escribe un precio mayor que 0.");
+  if (textoStock === "" || !Number.isInteger(stock) || stock < 0) return falla("Escribe la cantidad en stock: un número entero, 0 o más.");
+  crear(e.target, "/admin/catalogo/productos", {nombre: $("#pNombre").value.trim(), categoria: $("#pCat").value, subcategoria: $("#pSub").value, precio, stock}, $("#pErr"), async d => {
+    $("#pNombre").value = ""; $("#pPrecio").value = ""; $("#pStock").value = ""; await cargarDatos();
+    const ok = $("#pOk"); ok.hidden = false;
+    ok.innerHTML = `Producto «${esc(d.nombre)}» creado (${esc(d.product_id)}) con ${d.stock.toLocaleString("es-CO")} ${d.stock === 1 ? "unidad" : "unidades"}. <a href="/?q=${encodeURIComponent(d.nombre)}">Verlo en la tienda</a>`;
+    aviso("Producto agregado a la tienda");
+  });
+});
+
+/* ---------- arranque ---------- */
+(async () => {
+  const r = await api("/admin/yo");
+  if (r.ok && r.datos.admin) mostrarPanel(r.datos.cuenta);
+  else mostrarAcceso(r.ok && r.datos.sesion ? r.datos.cuenta : null);
+})();
+</script>
+</body>
+</html>

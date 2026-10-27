@@ -1,0 +1,544 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mercado Express</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --ink:#0B2027; --ink-2:#4A5C63; --teal:#028090; --teal-dark:#01626E; --teal-soft:#DDEEF0;
+  --bg:#F2F5F6; --panel:#FFFFFF; --line:#D7DFE2; --well:#E6EDEE;
+  --ok:#1E7A4C; --ok-bg:#E3F3EA; --bad:#B3361F; --bad-bg:#FBE9E5;
+  --display:"Bricolage Grotesque","IBM Plex Sans",system-ui,sans-serif;
+  --text:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+}
+*{box-sizing:border-box}
+html{font-size:16px}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--text);line-height:1.5;-webkit-font-smoothing:antialiased}
+h1,h2,h3{font-family:var(--display);font-weight:700;letter-spacing:-.01em;margin:0;line-height:1.15}
+h1{font-size:1.75rem} h2{font-size:1.2rem} h3{font-size:1rem}
+button,input,select{font:inherit;color:inherit}
+:focus-visible{outline:3px solid var(--teal);outline-offset:2px}
+[hidden]{display:none!important}
+.num{font-variant-numeric:tabular-nums}
+
+/* ---------- acceso ---------- */
+#acceso{min-height:100vh;display:grid;place-items:center;padding:24px}
+.acceso-caja{width:min(420px,100%);background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:32px}
+.marca{font-family:var(--display);font-weight:700;font-size:1.35rem;display:flex;align-items:center;gap:10px}
+.marca i{width:14px;height:14px;background:var(--teal);border-radius:3px;display:inline-block;transform:rotate(45deg)}
+.acceso-caja p{color:var(--ink-2);margin:12px 0 20px}
+
+/* ---------- estructura ---------- */
+#app{display:grid;grid-template-columns:216px 1fr;min-height:100vh}
+nav.lateral{background:var(--ink);color:#fff;padding:22px 14px;display:flex;flex-direction:column;gap:4px;position:sticky;top:0;height:100vh}
+nav.lateral .marca{padding:0 10px 18px;color:#fff}
+nav.lateral button.item{background:none;border:0;color:#BFD0D5;text-align:left;padding:9px 12px;border-radius:7px;cursor:pointer}
+nav.lateral button.item:hover{background:rgba(255,255,255,.08);color:#fff}
+nav.lateral a.item{display:block;text-decoration:none;color:#BFD0D5;padding:9px 12px;border-radius:7px;margin-top:10px;border:1px dashed rgba(255,255,255,.25)}
+nav.lateral a.item:hover{background:rgba(255,255,255,.08);color:#fff}
+nav.lateral button.item[aria-current=page]{background:var(--teal);color:#fff;font-weight:600}
+.nivel{margin-top:auto;padding:12px 10px 0;border-top:1px solid rgba(255,255,255,.14);font-size:.85rem;color:#BFD0D5}
+.nivel b{color:#fff;display:block;font-weight:600}
+.nivel button{margin-top:8px;background:none;border:1px solid rgba(255,255,255,.35);color:#fff;border-radius:6px;padding:5px 10px;cursor:pointer}
+.nivel button:hover{background:rgba(255,255,255,.1)}
+main{padding:28px clamp(16px,3vw,40px) 60px;min-width:0}
+.vista-cab{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:18px;flex-wrap:wrap}
+.sub{color:var(--ink-2);margin:4px 0 0;font-size:.95rem}
+
+/* ---------- controles ---------- */
+.btn{background:var(--teal);color:#fff;border:0;border-radius:7px;padding:9px 16px;font-weight:600;cursor:pointer}
+.btn:hover{background:var(--teal-dark)}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+.btn.sec{background:var(--panel);color:var(--ink);border:1px solid var(--line)}
+.btn.sec:hover{background:var(--well)}
+.btn.link{background:none;border:0;color:var(--teal-dark);padding:0;text-decoration:underline;font-weight:500;cursor:pointer}
+label{display:block;font-size:.85rem;font-weight:500;color:var(--ink-2);margin-bottom:4px}
+input[type=text],input[type=password],input[type=search],input[type=date],input[type=number],select{
+  width:100%;background:#fff;border:1px solid #B9C6CA;border-radius:6px;padding:8px 10px;min-height:38px}
+input:disabled,select:disabled{background:var(--well);color:var(--ink-2)}
+.filtros{display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end;margin-bottom:16px}
+.filtros>div{min-width:150px;flex:1 1 150px;max-width:260px}
+.chk{display:flex;gap:8px;align-items:center;font-size:.9rem;color:var(--ink);font-weight:400;margin:0;padding-bottom:8px}
+.chk input{width:18px;height:18px;accent-color:var(--teal)}
+.nota{font-size:.82rem;color:var(--ink-2)}
+
+/* ---------- tablas ---------- */
+.tabla-caja{background:var(--panel);border:1px solid var(--line);border-radius:10px;overflow:auto}
+table{border-collapse:collapse;width:100%;font-size:.93rem}
+th{background:var(--well);text-align:left;font-weight:600;padding:9px 14px;white-space:nowrap;font-size:.85rem}
+td{padding:9px 14px;border-top:1px solid var(--line);vertical-align:top}
+td.r,th.r{text-align:right;font-variant-numeric:tabular-nums}
+tr.clic{cursor:pointer}
+tr.clic:hover td{background:var(--teal-soft)}
+td .id{font-family:ui-monospace,SFMono-Regular,Consolas,monospace;font-size:.85rem}
+.pager{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 4px;color:var(--ink-2);font-size:.9rem;flex-wrap:wrap}
+.pager div{display:flex;gap:8px}
+.vacio{padding:36px 16px;text-align:center;color:var(--ink-2)}
+
+/* ---------- avisos ---------- */
+.aviso{border-radius:8px;padding:11px 14px;margin-bottom:14px;font-size:.93rem}
+.aviso.error{background:var(--bad-bg);color:var(--bad);border:1px solid #EFC3BA}
+.aviso.ok{background:var(--ok-bg);color:var(--ok);border:1px solid #B9DEC9}
+.aviso ul{margin:6px 0 0;padding-left:20px}
+
+/* ---------- resumen tipo recibo ---------- */
+.recibo{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:8px 26px;max-width:640px}
+.recibo .fila{display:flex;align-items:baseline;gap:10px;padding:13px 0;border-bottom:1px solid var(--line)}
+.recibo .fila:last-child{border-bottom:0}
+.recibo .fila span:first-child{color:var(--ink-2)}
+.recibo .fila .puntos{flex:1;border-bottom:2px dotted #B9C6CA;transform:translateY(-4px)}
+.recibo .fila b{font-family:var(--display);font-size:1.5rem;font-variant-numeric:tabular-nums}
+.recibo .fila.total b{color:var(--teal-dark)}
+
+/* ---------- reportes ---------- */
+.rep{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:20px 22px;margin-bottom:20px}
+.rep header{display:flex;justify-content:space-between;gap:12px;align-items:flex-start;flex-wrap:wrap;margin-bottom:12px}
+.rep p.sub{margin-top:2px}
+.barra-fila{display:grid;grid-template-columns:minmax(140px,230px) 1fr 140px;gap:12px;align-items:center;padding:5px 0;font-size:.9rem}
+.barra{height:12px;background:var(--well);border-radius:3px;overflow:hidden}
+.barra i{display:block;height:100%;background:var(--teal);border-radius:3px}
+.barra-fila .v{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+.barra-fila .et{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+/* ---------- diálogos ---------- */
+dialog{border:0;border-radius:12px;padding:0;width:min(560px,94vw);max-height:92vh;background:var(--bg);color:var(--ink);box-shadow:0 20px 60px rgba(11,32,39,.35)}
+dialog.ancho{width:min(1000px,96vw)}
+dialog::backdrop{background:rgba(11,32,39,.55)}
+.dlg-cab{display:flex;justify-content:space-between;align-items:center;padding:16px 22px;border-bottom:1px solid var(--line);background:var(--panel);position:sticky;top:0;z-index:2}
+.dlg-cuerpo{padding:20px 22px 24px;overflow:auto;max-height:calc(92vh - 64px)}
+.cerrar{background:none;border:0;font-size:1.6rem;line-height:1;cursor:pointer;color:var(--ink-2);padding:2px 8px;border-radius:6px}
+.cerrar:hover{background:var(--well)}
+.dato{display:grid;grid-template-columns:150px 1fr;gap:4px 12px;margin:0 0 16px}
+.dato dt{color:var(--ink-2);font-size:.9rem} .dato dd{margin:0}
+.campos{display:grid;grid-template-columns:1fr 1fr;gap:12px 14px}
+.campos .todo{grid-column:1/-1}
+
+/* ---------- tiquete de pedido ---------- */
+.pedido-grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.25fr);gap:22px;align-items:start}
+.buscador-res{border:1px solid var(--line);border-radius:8px;background:#fff;margin-top:6px;max-height:230px;overflow:auto}
+.buscador-res button{display:block;width:100%;text-align:left;background:none;border:0;border-bottom:1px solid var(--line);padding:8px 12px;cursor:pointer}
+.buscador-res button:last-child{border-bottom:0}
+.buscador-res button:hover{background:var(--teal-soft)}
+.buscador-res small{display:block;color:var(--ink-2)}
+.tiquete{background:#fff;padding:20px 20px 16px;position:relative;margin-bottom:14px;border-top:5px solid var(--teal)}
+.tiquete::after{content:"";position:absolute;left:0;right:0;bottom:-12px;height:12px;
+  background:linear-gradient(135deg,#fff 50%,transparent 0) 0 0/16px 16px,linear-gradient(225deg,#fff 50%,transparent 0) 0 0/16px 16px}
+.tiquete h3{display:flex;justify-content:space-between;align-items:baseline;border-bottom:2px dashed #B9C6CA;padding-bottom:10px;margin-bottom:6px}
+.linea{border-bottom:1px dashed var(--line);padding:10px 0}
+.linea .nombre{display:flex;justify-content:space-between;gap:8px;font-weight:500;font-size:.92rem}
+.linea .nombre button{background:none;border:0;color:var(--bad);cursor:pointer;font-size:.85rem;white-space:nowrap}
+.linea .vals{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:6px}
+.linea .vals label{font-size:.75rem;margin-bottom:2px}
+.linea .vals input{min-height:34px;padding:5px 8px}
+.total-fila{display:flex;justify-content:space-between;align-items:baseline;padding-top:12px;font-size:1.05rem}
+.total-fila b{font-family:var(--display);font-size:1.6rem;font-variant-numeric:tabular-nums}
+.tiquete .vacio{padding:22px 8px}
+
+@media (max-width:820px){
+  #app{grid-template-columns:1fr}
+  nav.lateral{position:static;height:auto;flex-direction:row;flex-wrap:wrap;align-items:center;padding:12px}
+  nav.lateral .marca{padding:0 8px 0 4px}
+  .nivel{margin:0 0 0 auto;border:0;padding:0;display:flex;gap:10px;align-items:center}
+  .nivel button{margin:0}
+  .pedido-grid{grid-template-columns:1fr}
+  .campos{grid-template-columns:1fr}
+  .barra-fila{grid-template-columns:1fr auto}.barra-fila .barra{grid-column:1/-1;order:3}
+  .dato{grid-template-columns:1fr}
+}
+@media (prefers-reduced-motion:no-preference){ .btn{transition:background .12s} }
+</style>
+</head>
+<body>
+
+<!-- ===================== ACCESO ===================== -->
+<section id="acceso">
+  <form class="acceso-caja" id="formAcceso" autocomplete="off">
+    <div class="marca"><i></i>Mercado Express</div>
+    <p>Escribe tu clave para entrar. Es la clave de usuario o la de administrador que definiste al arrancar la API.</p>
+    <label for="clave">Clave de acceso</label>
+    <input type="password" id="clave" required autofocus>
+    <div id="errAcceso" class="aviso error" hidden style="margin-top:12px"></div>
+    <button class="btn" style="width:100%;margin-top:16px" type="submit">Entrar</button>
+  </form>
+</section>
+
+<!-- ===================== APP ===================== -->
+<div id="app" hidden>
+  <nav class="lateral" aria-label="Secciones">
+    <div class="marca"><i></i>Mercado Express</div>
+    <button class="item" data-v="resumen">Resumen</button>
+    <button class="item" data-v="clientes">Clientes</button>
+    <button class="item" data-v="productos">Productos</button>
+    <button class="item" data-v="pedidos">Pedidos</button>
+    <button class="item" data-v="reportes">Reportes</button>
+    <button class="item" data-v="auditoria" id="navAud" hidden>Auditoría</button>
+    <a class="item" href="/admin/catalogo">Catálogo (crear productos)</a>
+    <a class="item" href="/">Ir a la tienda</a>
+    <div class="nivel"><div>Sesión como<b id="nivelTxt"></b></div><button id="salir">Cerrar sesión</button></div>
+  </nav>
+  <main id="main" tabindex="-1"></main>
+</div>
+
+<dialog id="dlg"><div class="dlg-cab"><h2 id="dlgTitulo"></h2><button class="cerrar" id="dlgCerrar" aria-label="Cerrar">&times;</button></div><div class="dlg-cuerpo" id="dlgCuerpo"></div></dialog>
+
+<script>
+"use strict";
+/* ================= utilidades ================= */
+const $ = (s, r = document) => r.querySelector(s);
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const fmt = n => n == null ? "—" : Number(n).toLocaleString("en-US", {minimumFractionDigits: 2, maximumFractionDigits: 2});
+const usd = n => n == null ? "—" : "US$ " + fmt(n);
+const entero = n => Number(n).toLocaleString("en-US");
+const hoy = () => new Date().toLocaleDateString("en-CA");
+const debounce = (fn, ms = 300) => { let t; return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), ms); }; };
+
+let CLAVE = "", ES_ADMIN = false, VISTA = "resumen";
+const main = $("#main");
+
+async function api(ruta, {metodo = "GET", cuerpo} = {}) {
+  let r;
+  try {
+    r = await fetch(ruta, {method: metodo,
+      headers: Object.assign({"X-API-Key": CLAVE}, cuerpo ? {"Content-Type": "application/json"} : {}),
+      body: cuerpo ? JSON.stringify(cuerpo) : undefined});
+  } catch (e) {
+    return {ok: false, status: 0, datos: {error: "No se pudo conectar con la API. ¿Sigue corriendo python app.py?"}};
+  }
+  let datos = null; try { datos = await r.json(); } catch (e) {}
+  if (r.status === 401 && CLAVE) cerrarSesion("La clave ya no es válida. Entra de nuevo.");
+  return {ok: r.ok, status: r.status, datos};
+}
+
+function avisoError(r) {
+  const d = r.datos || {};
+  const lista = Array.isArray(d.detalles) && d.detalles.length
+    ? `<ul>${d.detalles.map(x => `<li>${esc(x)}</li>`).join("")}</ul>` : "";
+  return `<div class="aviso error" role="alert"><b>${esc(d.error || "Algo salió mal")}</b>${lista}</div>`;
+}
+
+function paginador(total, pagina, limite) {
+  const paginas = Math.max(1, Math.ceil(total / limite));
+  return `<div class="pager"><span>${entero(total)} resultados · página ${pagina} de ${paginas}</span>
+    <div><button class="btn sec" data-p="${pagina - 1}" ${pagina <= 1 ? "disabled" : ""}>Anterior</button>
+    <button class="btn sec" data-p="${pagina + 1}" ${pagina >= paginas ? "disabled" : ""}>Siguiente</button></div></div>`;
+}
+function enlazarPaginador(cont, estado, recargar) {
+  cont.querySelectorAll(".pager button[data-p]").forEach(b => b.addEventListener("click", () => {
+    estado.pagina = Number(b.dataset.p); recargar();
+  }));
+}
+
+/* ================= diálogo ================= */
+const dlg = $("#dlg");
+function abrirDialogo(titulo, html, ancho = false) {
+  $("#dlgTitulo").textContent = titulo;
+  $("#dlgCuerpo").innerHTML = html;
+  dlg.classList.toggle("ancho", ancho);
+  if (!dlg.open) dlg.showModal();
+  return $("#dlgCuerpo");
+}
+$("#dlgCerrar").addEventListener("click", () => dlg.close());
+dlg.addEventListener("click", e => { if (e.target === dlg) dlg.close(); });
+
+/* ================= sesión ================= */
+function guardarClave(k) { try { k ? sessionStorage.setItem("me_clave", k) : sessionStorage.removeItem("me_clave"); } catch (e) {} }
+function leerClave() { try { return sessionStorage.getItem("me_clave") || ""; } catch (e) { return ""; } }
+
+async function entrar(clave) {
+  CLAVE = clave;
+  const r = await api("/resumen");
+  if (!r.ok) { CLAVE = ""; return r; }
+  ES_ADMIN = (await api("/admin/auditoria")).ok;
+  guardarClave(clave);
+  $("#acceso").hidden = true; $("#app").hidden = false;
+  $("#nivelTxt").textContent = ES_ADMIN ? "Administrador" : "Usuario";
+  $("#navAud").hidden = !ES_ADMIN;
+  ir("resumen");
+  return r;
+}
+function cerrarSesion(mensaje) {
+  CLAVE = ""; ES_ADMIN = false; guardarClave("");
+  if (dlg.open) dlg.close();
+  $("#app").hidden = true; $("#acceso").hidden = false; $("#clave").value = "";
+  const e = $("#errAcceso"); e.hidden = !mensaje; e.textContent = mensaje || "";
+}
+$("#formAcceso").addEventListener("submit", async ev => {
+  ev.preventDefault();
+  const r = await entrar($("#clave").value);
+  const e = $("#errAcceso");
+  if (!r.ok) { e.hidden = false; e.textContent = r.status === 401 ? "Clave incorrecta. Revisa que sea la misma que definiste al arrancar la API." : (r.datos?.error || "No se pudo entrar"); }
+  else e.hidden = true;
+});
+$("#salir").addEventListener("click", () => cerrarSesion());
+
+document.querySelectorAll("nav.lateral button.item").forEach(b => b.addEventListener("click", () => ir(b.dataset.v)));
+function ir(v) {
+  VISTA = v;
+  document.querySelectorAll("nav.lateral button.item").forEach(b => b.setAttribute("aria-current", b.dataset.v === v ? "page" : "false"));
+  vistas[v]();
+  main.focus({preventScroll: true});
+}
+
+/* ================= RESUMEN ================= */
+async function vResumen() {
+  main.innerHTML = `<div class="vista-cab"><div><h1>Resumen</h1><p class="sub">Lo que hay hoy en la base de datos.</p></div></div><div id="res">Cargando…</div>`;
+  const r = await api("/resumen");
+  if (!r.ok) { $("#res").innerHTML = avisoError(r); return; }
+  const d = r.datos;
+  const fila = (t, v, cls = "") => `<div class="fila ${cls}"><span>${t}</span><span class="puntos"></span><b>${v}</b></div>`;
+  $("#res").innerHTML = `<div class="recibo">
+    ${fila("Clientes", entero(d.clientes))}${fila("Productos", entero(d.productos))}
+    ${fila("Pedidos", entero(d.pedidos))}${fila("Líneas de pedido", entero(d.lineas_de_pedido))}
+    ${fila("Ventas totales", usd(d.ventas_totales))}${fila("Ganancia total", usd(d.ganancia_total), "total")}</div>`;
+}
+
+/* ================= CLIENTES ================= */
+const estC = {pagina: 1, q: "", region: "", segmento: "", completo: false};
+async function vClientes() {
+  main.innerHTML = `<div class="vista-cab"><div><h1>Clientes</h1>
+    <p class="sub">Los nombres salen abreviados para proteger los datos personales (Ley 1581 de 2012).</p></div>
+    <button class="btn" id="nuevoCli">Nuevo cliente</button></div>
+    <form class="filtros" id="fC" onsubmit="return false">
+      <div><label for="cq">Buscar por nombre</label><input type="search" id="cq" value="${esc(estC.q)}"></div>
+      <div><label for="cr">Región</label><select id="cr"><option value="">Todas</option>${["Central","East","South","West"].map(x => `<option ${estC.region === x ? "selected" : ""}>${x}</option>`).join("")}</select></div>
+      <div><label for="cs">Segmento</label><select id="cs"><option value="">Todos</option>${["Consumer","Corporate","Home Office"].map(x => `<option ${estC.segmento === x ? "selected" : ""}>${x}</option>`).join("")}</select></div>
+      <div><label class="chk" title="${ES_ADMIN ? "" : "Solo la clave de administrador puede ver datos completos"}"><input type="checkbox" id="cc" ${estC.completo && ES_ADMIN ? "checked" : ""} ${ES_ADMIN ? "" : "disabled"}> Ver datos completos</label>
+        <span class="nota">${ES_ADMIN ? "Cada consulta queda en la auditoría." : "Requiere clave de administrador."}</span></div>
+    </form><div id="res"></div>`;
+  const recargar = async () => {
+    const p = new URLSearchParams({pagina: estC.pagina, limite: 15});
+    if (estC.q) p.set("q", estC.q); if (estC.region) p.set("region", estC.region); if (estC.segmento) p.set("segmento", estC.segmento);
+    if (estC.completo && ES_ADMIN) p.set("completo", "1");
+    const r = await api("/clientes?" + p);
+    const cont = $("#res");
+    if (!r.ok) { cont.innerHTML = avisoError(r); return; }
+    const d = r.datos, comp = estC.completo && ES_ADMIN;
+    if (!d.resultados.length) { cont.innerHTML = `<div class="tabla-caja"><div class="vacio">No hay clientes con ese filtro. Prueba con otro nombre o quita la región.</div></div>`; return; }
+    cont.innerHTML = `<div class="tabla-caja"><table><thead><tr><th>ID</th><th>Nombre</th><th>Segmento</th><th>Estado</th><th>Región</th>${comp ? "<th>Ciudad</th><th>Código postal</th>" : ""}</tr></thead><tbody>
+      ${d.resultados.map(c => `<tr class="clic" data-id="${esc(c.customer_id)}"><td><span class="id">${esc(c.customer_id)}</span></td><td>${esc(c.nombre)}</td><td>${esc(c.segmento)}</td><td>${esc(c.estado)}</td><td>${esc(c.region)}</td>${comp ? `<td>${esc(c.ciudad)}</td><td>${esc(c.codigo_postal)}</td>` : ""}</tr>`).join("")}
+      </tbody></table></div>${paginador(d.total, d.pagina, d.limite)}`;
+    enlazarPaginador(cont, estC, recargar);
+    cont.querySelectorAll("tr.clic").forEach(tr => tr.addEventListener("click", () => detalleCliente(tr.dataset.id)));
+  };
+  const filtrar = () => { estC.q = $("#cq").value.trim(); estC.region = $("#cr").value; estC.segmento = $("#cs").value; estC.completo = $("#cc").checked; estC.pagina = 1; recargar(); };
+  $("#cq").addEventListener("input", debounce(filtrar)); ["#cr", "#cs", "#cc"].forEach(s => $(s).addEventListener("change", filtrar));
+  $("#nuevoCli").addEventListener("click", formCliente);
+  recargar();
+}
+
+async function detalleCliente(id) {
+  const comp = estC.completo && ES_ADMIN;
+  const cuerpo = abrirDialogo("Cliente " + id, "Cargando…");
+  const [rc, rp] = await Promise.all([api(`/clientes/${encodeURIComponent(id)}${comp ? "?completo=1" : ""}`), api(`/pedidos?cliente_id=${encodeURIComponent(id)}&limite=5`)]);
+  if (!rc.ok) { cuerpo.innerHTML = avisoError(rc); return; }
+  const c = rc.datos;
+  const autoriz = c.autorizacion_datos === true ? "Sí" : c.autorizacion_datos === false ? "No" : "Sin registro (cliente histórico)";
+  cuerpo.innerHTML = `<dl class="dato"><dt>Nombre</dt><dd>${esc(c.nombre)}</dd><dt>Segmento</dt><dd>${esc(c.segmento)}</dd>
+    <dt>País / estado</dt><dd>${esc(c.pais)} / ${esc(c.estado)}</dd><dt>Región</dt><dd>${esc(c.region)}</dd>
+    ${comp ? `<dt>Ciudad</dt><dd>${esc(c.ciudad)}</dd><dt>Código postal</dt><dd>${esc(c.codigo_postal)}</dd><dt>Autorizó sus datos</dt><dd>${autoriz}</dd>` : ""}
+    <dt>Pedidos</dt><dd>${entero(c.total_pedidos)}</dd></dl>
+    ${comp ? "" : `<p class="nota">Ciudad, código postal y autorización solo se muestran con “Ver datos completos” y clave de administrador.</p>`}
+    <h3 style="margin:14px 0 8px">Pedidos más recientes</h3>
+    ${rp.ok && rp.datos.resultados.length ? `<div class="tabla-caja"><table><thead><tr><th>Pedido</th><th>Fecha</th><th>Envío</th></tr></thead><tbody>
+      ${rp.datos.resultados.map(p => `<tr class="clic" data-o="${esc(p.order_id)}"><td><span class="id">${esc(p.order_id)}</span></td><td>${esc(p.fecha_pedido)}</td><td>${esc(p.modo_envio)}</td></tr>`).join("")}</tbody></table></div>`
+      : `<p class="nota">Este cliente todavía no tiene pedidos.</p>`}`;
+  cuerpo.querySelectorAll("tr[data-o]").forEach(tr => tr.addEventListener("click", () => detallePedido(tr.dataset.o)));
+}
+
+function formCliente() {
+  const cuerpo = abrirDialogo("Nuevo cliente", `<form id="fNC" class="campos" autocomplete="off">
+    <div class="todo"><label for="nc1">Nombre completo</label><input type="text" id="nc1" required></div>
+    <div><label for="nc2">Segmento</label><select id="nc2"><option>Consumer</option><option>Corporate</option><option>Home Office</option></select></div>
+    <div><label for="nc3">Región</label><select id="nc3"><option>Central</option><option>East</option><option selected>South</option><option>West</option></select></div>
+    <div><label for="nc4">País</label><input type="text" id="nc4" value="United States"></div>
+    <div><label for="nc5">Estado</label><input type="text" id="nc5"></div>
+    <div><label for="nc6">Ciudad</label><input type="text" id="nc6"></div>
+    <div><label for="nc7">Código postal</label><input type="text" id="nc7"></div>
+    <label class="chk todo"><input type="checkbox" id="nc8"> El cliente autoriza el tratamiento de sus datos personales (Ley 1581 de 2012)</label>
+    <div class="todo" id="ncMsg"></div>
+    <div class="todo"><button class="btn" type="submit">Guardar cliente</button></div></form>`);
+  $("#fNC", cuerpo).addEventListener("submit", async ev => {
+    ev.preventDefault();
+    const r = await api("/clientes", {metodo: "POST", cuerpo: {nombre: $("#nc1").value, segmento: $("#nc2").value, region: $("#nc3").value,
+      pais: $("#nc4").value, estado: $("#nc5").value, ciudad: $("#nc6").value, codigo_postal: $("#nc7").value, autorizacion_datos: $("#nc8").checked}});
+    $("#ncMsg").innerHTML = r.ok ? `<div class="aviso ok">Cliente guardado con el ID <b>${esc(r.datos.customer_id)}</b>.</div>` : avisoError(r);
+    if (r.ok && VISTA === "clientes") { estC.pagina = 1; vClientes(); }
+  });
+}
+
+/* ================= PRODUCTOS ================= */
+const estP = {pagina: 1, q: "", categoria: ""};
+async function vProductos() {
+  main.innerHTML = `<div class="vista-cab"><div><h1>Productos</h1><p class="sub">Catálogo con el que se arman los pedidos.</p></div></div>
+    <form class="filtros" onsubmit="return false">
+      <div><label for="pq">Buscar por nombre</label><input type="search" id="pq" value="${esc(estP.q)}"></div>
+      <div><label for="pc">Categoría</label><select id="pc"><option value="">Todas</option>${["Furniture","Office Supplies","Technology"].map(x => `<option ${estP.categoria === x ? "selected" : ""}>${x}</option>`).join("")}</select></div></form><div id="res"></div>`;
+  const recargar = async () => {
+    const p = new URLSearchParams({pagina: estP.pagina, limite: 15});
+    if (estP.q) p.set("q", estP.q); if (estP.categoria) p.set("categoria", estP.categoria);
+    const r = await api("/productos?" + p), cont = $("#res");
+    if (!r.ok) { cont.innerHTML = avisoError(r); return; }
+    const d = r.datos;
+    if (!d.resultados.length) { cont.innerHTML = `<div class="tabla-caja"><div class="vacio">No hay productos con ese nombre. Prueba con una palabra más corta.</div></div>`; return; }
+    cont.innerHTML = `<div class="tabla-caja"><table><thead><tr><th>ID</th><th>Producto</th><th>Categoría</th><th>Subcategoría</th></tr></thead><tbody>
+      ${d.resultados.map(x => `<tr><td><span class="id">${esc(x.product_id)}</span></td><td>${esc(x.nombre)}</td><td>${esc(x.categoria)}</td><td>${esc(x.subcategoria)}</td></tr>`).join("")}</tbody></table></div>${paginador(d.total, d.pagina, d.limite)}`;
+    enlazarPaginador(cont, estP, recargar);
+  };
+  const filtrar = () => { estP.q = $("#pq").value.trim(); estP.categoria = $("#pc").value; estP.pagina = 1; recargar(); };
+  $("#pq").addEventListener("input", debounce(filtrar)); $("#pc").addEventListener("change", filtrar);
+  recargar();
+}
+
+/* ================= PEDIDOS ================= */
+const estO = {pagina: 1, cliente: ""};
+async function vPedidos() {
+  main.innerHTML = `<div class="vista-cab"><div><h1>Pedidos</h1><p class="sub">Haz clic en un pedido para ver sus productos.</p></div>
+    <button class="btn" id="nuevoPed">Nuevo pedido</button></div>
+    <form class="filtros" onsubmit="return false"><div><label for="oc">ID de cliente</label><input type="search" id="oc" placeholder="Ej: CG-12520" value="${esc(estO.cliente)}"></div></form><div id="res"></div>`;
+  const recargar = async () => {
+    const p = new URLSearchParams({pagina: estO.pagina, limite: 15}); if (estO.cliente) p.set("cliente_id", estO.cliente);
+    const r = await api("/pedidos?" + p), cont = $("#res");
+    if (!r.ok) { cont.innerHTML = avisoError(r); return; }
+    const d = r.datos;
+    if (!d.resultados.length) { cont.innerHTML = `<div class="tabla-caja"><div class="vacio">No hay pedidos para ese cliente. Revisa el ID o quita el filtro.</div></div>`; return; }
+    cont.innerHTML = `<div class="tabla-caja"><table><thead><tr><th>Pedido</th><th>Cliente</th><th>Fecha</th><th>Envío</th><th>Modo de envío</th></tr></thead><tbody>
+      ${d.resultados.map(o => `<tr class="clic" data-o="${esc(o.order_id)}"><td><span class="id">${esc(o.order_id)}</span></td><td><span class="id">${esc(o.customer_id)}</span></td><td>${esc(o.fecha_pedido)}</td><td>${esc(o.fecha_envio || "—")}</td><td>${esc(o.modo_envio)}</td></tr>`).join("")}</tbody></table></div>${paginador(d.total, d.pagina, d.limite)}`;
+    enlazarPaginador(cont, estO, recargar);
+    cont.querySelectorAll("tr.clic").forEach(tr => tr.addEventListener("click", () => detallePedido(tr.dataset.o)));
+  };
+  $("#oc").addEventListener("input", debounce(() => { estO.cliente = $("#oc").value.trim(); estO.pagina = 1; recargar(); }));
+  $("#nuevoPed").addEventListener("click", formPedido);
+  recargar();
+}
+
+async function detallePedido(id) {
+  const cuerpo = abrirDialogo("Pedido " + id, "Cargando…");
+  const r = await api("/pedidos/" + encodeURIComponent(id));
+  if (!r.ok) { cuerpo.innerHTML = avisoError(r); return; }
+  const p = r.datos;
+  cuerpo.innerHTML = `<dl class="dato"><dt>Cliente</dt><dd><span class="id">${esc(p.customer_id)}</span></dd><dt>Fecha del pedido</dt><dd>${esc(p.fecha_pedido)}</dd>
+    <dt>Fecha de envío</dt><dd>${esc(p.fecha_envio || "—")}</dd><dt>Modo de envío</dt><dd>${esc(p.modo_envio)}</dd></dl>
+    <div class="tabla-caja"><table><thead><tr><th>Producto</th><th class="r">Cant.</th><th class="r">Desc.</th><th class="r">Ventas</th><th class="r">Ganancia</th></tr></thead><tbody>
+    ${p.items.map(i => `<tr><td>${esc(i.producto)}<br><span class="id">${esc(i.product_id)}</span></td><td class="r">${entero(i.cantidad)}</td><td class="r">${Math.round((i.descuento || 0) * 100)}%</td><td class="r">${usd(i.ventas)}</td><td class="r">${usd(i.ganancia)}</td></tr>`).join("")}
+    </tbody></table></div><div class="total-fila"><span>Total de ventas</span><b>${usd(p.total_ventas)}</b></div>`;
+}
+
+/* ---- nuevo pedido: formulario + tiquete ---- */
+function formPedido() {
+  let lineas = [];
+  const cuerpo = abrirDialogo("Nuevo pedido", `<div class="pedido-grid"><div>
+      <div class="campos">
+        <div class="todo"><label for="np1">ID del cliente</label><input type="text" id="np1" placeholder="Ej: CG-12520"></div>
+        <div class="todo"><label for="np2">Modo de envío</label><select id="np2"><option>Standard Class</option><option>Second Class</option><option>First Class</option><option>Same Day</option></select></div>
+        <div><label for="np3">Fecha del pedido</label><input type="date" id="np3" value="${hoy()}"></div>
+        <div><label for="np4">Fecha de envío (opcional)</label><input type="date" id="np4"></div>
+      </div>
+      <h3 style="margin:20px 0 4px">Agregar productos</h3>
+      <label for="np5">Buscar en el catálogo</label><input type="search" id="np5" placeholder="Ej: bookcase">
+      <div id="npRes" class="buscador-res" hidden></div>
+    </div><div>
+      <div id="npMsg"></div>
+      <div class="tiquete"><h3><span>Tiquete de venta</span><span class="nota" id="npN"></span></h3><div id="npLin"></div>
+        <div class="total-fila"><span>Total</span><b id="npTot">US$ 0.00</b></div></div>
+      <button class="btn" id="npGuardar" style="width:100%;margin-top:18px">Registrar pedido</button>
+    </div></div>`, true);
+
+  const pintar = () => {
+    $("#npN").textContent = lineas.length ? `${lineas.length} ${lineas.length === 1 ? "producto" : "productos"}` : "";
+    $("#npLin", cuerpo).innerHTML = lineas.length ? lineas.map((l, i) => `<div class="linea"><div class="nombre"><span>${esc(l.product_name)}</span><button type="button" data-q="${i}">Quitar</button></div>
+      <div class="vals"><div><label>Cantidad</label><input type="number" step="1" data-i="${i}" data-k="quantity" value="${esc(l.quantity)}"></div>
+      <div><label>Ventas (US$)</label><input type="number" step="0.01" data-i="${i}" data-k="sales" value="${esc(l.sales)}"></div>
+      <div><label>Descuento (0 a 1)</label><input type="number" step="0.05" data-i="${i}" data-k="discount" value="${esc(l.discount)}"></div>
+      <div><label>Ganancia (US$)</label><input type="number" step="0.01" data-i="${i}" data-k="profit" value="${esc(l.profit)}"></div></div></div>`).join("")
+      : `<div class="vacio">Busca un producto en el catálogo y haz clic para agregarlo.</div>`;
+    total();
+  };
+  const total = () => { $("#npTot").textContent = usd(lineas.reduce((s, l) => s + (Number(l.sales) || 0), 0)); };
+
+  $("#npLin", cuerpo).addEventListener("input", e => {
+    const t = e.target; if (t.dataset.i === undefined) return;
+    lineas[Number(t.dataset.i)][t.dataset.k] = t.value; total();
+  });
+  $("#npLin", cuerpo).addEventListener("click", e => {
+    const q = e.target.dataset.q; if (q === undefined) return;
+    lineas.splice(Number(q), 1); pintar();
+  });
+
+  $("#np5").addEventListener("input", debounce(async () => {
+    const q = $("#np5").value.trim(), caja = $("#npRes");
+    if (q.length < 2) { caja.hidden = true; return; }
+    const r = await api(`/productos?limite=8&q=${encodeURIComponent(q)}`);
+    caja.hidden = false;
+    if (!r.ok || !r.datos.resultados.length) { caja.innerHTML = `<div class="vacio">Sin resultados para “${esc(q)}”.</div>`; return; }
+    caja.innerHTML = r.datos.resultados.map((x, i) => `<button type="button" data-k="${i}">${esc(x.nombre)}<small>${esc(x.product_id)} · ${esc(x.categoria)}</small></button>`).join("");
+    caja.querySelectorAll("button").forEach(b => b.addEventListener("click", () => {
+      const x = r.datos.resultados[Number(b.dataset.k)];
+      lineas.push({product_id: x.product_id, product_name: x.nombre, quantity: 1, sales: "", discount: 0, profit: ""});
+      pintar(); caja.hidden = true; $("#np5").value = "";
+    }));
+  }, 250));
+
+  $("#npGuardar").addEventListener("click", async () => {
+    const num = v => v === "" || v == null ? null : Number(v);
+    const cuerpoPed = {customer_id: $("#np1").value.trim(), modo_envio: $("#np2").value, fecha_pedido: $("#np3").value || hoy(),
+      items: lineas.map(l => ({product_id: l.product_id, product_name: l.product_name, quantity: num(l.quantity),
+        sales: num(l.sales), discount: l.discount === "" ? 0 : Number(l.discount), profit: num(l.profit)}))};
+    if ($("#np4").value) cuerpoPed.fecha_envio = $("#np4").value;
+    $("#npGuardar").disabled = true;
+    const r = await api("/pedidos", {metodo: "POST", cuerpo: cuerpoPed});
+    $("#npGuardar").disabled = false;
+    if (r.ok) {
+      const nuevo = r.datos.order_id; lineas = []; pintar();
+      $("#npMsg").innerHTML = `<div class="aviso ok" role="status">Pedido registrado con el ID <b>${esc(nuevo)}</b>. Se guardó completo.
+        <button class="btn link" id="npVer" type="button">Ver pedido</button></div>`;
+      $("#npVer").addEventListener("click", () => detallePedido(nuevo));
+      if (VISTA === "pedidos") vPedidos();
+    } else {
+      $("#npMsg").innerHTML = avisoError(r) + (r.status >= 400 ? `<p class="nota" style="margin:-6px 0 12px">No se guardó nada: el pedido y sus productos se guardan juntos o no se guardan.</p>` : "");
+    }
+  });
+  pintar();
+}
+
+/* ================= REPORTES ================= */
+let repCompleto = false;
+async function vReportes() {
+  main.innerHTML = `<div class="vista-cab"><div><h1>Reportes</h1><p class="sub">Las tres consultas del Momento Evaluativo 1.</p></div></div><div id="rep">Cargando…</div>`;
+  const [a, b, c] = await Promise.all([api("/reportes/ventas-por-categoria"),
+    api("/reportes/ganancia-por-cliente" + (repCompleto && ES_ADMIN ? "?completo=1" : "")), api("/reportes/envio-por-region")]);
+  const barras = (filas, et, val, fmtv, max) => filas.map(f => `<div class="barra-fila"><span class="et" title="${esc(et(f))}">${esc(et(f))}</span>
+    <div class="barra"><i style="width:${Math.max(1, (val(f) / max) * 100)}%"></i></div><span class="v">${fmtv(val(f))}</span></div>`).join("");
+  let html = "";
+  html += `<section class="rep"><header><div><h2>Ventas por categoría</h2><p class="sub">Las 10 subcategorías con más ventas.</p></div></header>${a.ok
+    ? barras(a.datos, f => `${f.categoria} · ${f.subcategoria}`, f => f.total_ventas, usd, Math.max(...a.datos.map(f => f.total_ventas))) : avisoError(a)}</section>`;
+  html += `<section class="rep"><header><div><h2>Clientes que más ganancia dejan</h2><p class="sub">Top 10 por ganancia total.</p></div>
+    <label class="chk" title="${ES_ADMIN ? "" : "Solo la clave de administrador"}"><input type="checkbox" id="repC" ${repCompleto && ES_ADMIN ? "checked" : ""} ${ES_ADMIN ? "" : "disabled"}> Nombres completos</label></header>${b.ok
+    ? barras(b.datos, f => f.nombre, f => f.ganancia_total, usd, Math.max(...b.datos.map(f => f.ganancia_total))) : avisoError(b)}</section>`;
+  html += `<section class="rep"><header><div><h2>Días promedio de envío</h2><p class="sub">Por modo de envío y región del cliente (16 combinaciones).</p></div></header>${c.ok
+    ? barras(c.datos, f => `${f.modo_envio} · ${f.region}`, f => f.dias_promedio_envio, v => fmt(v) + " días", Math.max(...c.datos.map(f => f.dias_promedio_envio))) : avisoError(c)}</section>`;
+  $("#rep").innerHTML = html;
+  const chk = $("#repC"); if (chk) chk.addEventListener("change", () => { repCompleto = chk.checked; vReportes(); });
+}
+
+/* ================= AUDITORÍA ================= */
+async function vAuditoria() {
+  main.innerHTML = `<div class="vista-cab"><div><h1>Auditoría</h1><p class="sub">Los últimos accesos a datos personales completos.</p></div><button class="btn sec" id="recA">Actualizar</button></div><div id="res">Cargando…</div>`;
+  $("#recA").addEventListener("click", vAuditoria);
+  const r = await api("/admin/auditoria");
+  if (!r.ok) { $("#res").innerHTML = avisoError(r); return; }
+  $("#res").innerHTML = r.datos.length ? `<div class="tabla-caja"><table><thead><tr><th>Fecha</th><th>Nivel</th><th>Ruta</th><th>Detalle</th></tr></thead><tbody>
+    ${r.datos.map(x => `<tr><td class="num">${esc(x.fecha)}</td><td>${esc(x.nivel)}</td><td><span class="id">${esc(x.endpoint)}</span></td><td>${esc(x.detalle)}</td></tr>`).join("")}</tbody></table></div>`
+    : `<div class="tabla-caja"><div class="vacio">Todavía no hay accesos a datos completos. Aparecerán cuando uses “Ver datos completos”.</div></div>`;
+}
+
+const vistas = {resumen: vResumen, clientes: vClientes, productos: vProductos, pedidos: vPedidos, reportes: vReportes, auditoria: vAuditoria};
+
+/* ================= arranque ================= */
+(async () => { const k = leerClave(); if (k) { const r = await entrar(k); if (!r.ok) cerrarSesion(); } })();
+</script>
+</body>
+</html>
