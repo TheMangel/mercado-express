@@ -839,3 +839,24 @@ def test_base_vieja_sin_stock_se_migra_con_cero(tmp_path):
     conn = sqlite3.connect(ruta)
     assert conn.execute("SELECT COUNT(*), MIN(stock), MAX(stock) FROM productos").fetchone()[1:] == (0, 0)
     conn.close()
+
+
+# ----------------------------------------------------------- CSRF (origen de las peticiones)
+def test_csrf_rechaza_peticion_que_cambia_datos_desde_otro_sitio(c):
+    r = c.post("/cuenta/entrar", json={"email": "a@b.co", "password": "x"},
+               headers={"Origin": "https://sitio-malicioso.example"})
+    assert r.status_code == 403
+    r = c.post("/cuenta/entrar", json={"email": "a@b.co", "password": "x"},
+               headers={"Sec-Fetch-Site": "cross-site"})
+    assert r.status_code == 403
+
+
+def test_csrf_acepta_el_mismo_sitio_y_los_clientes_sin_navegador(c):
+    malo = {"email": "no-existe@b.co", "password": "x"}
+    # Mismo origen (como lo envía el navegador): llega a la lógica normal (401 por credenciales)
+    r = c.post("/cuenta/entrar", json=malo, headers={"Origin": "http://localhost"})
+    assert r.status_code == 401
+    # Sin Origin (curl, scripts): también llega a la lógica normal
+    assert c.post("/cuenta/entrar", json=malo).status_code == 401
+    # Las lecturas (GET) nunca se bloquean
+    assert c.get("/tienda/config", headers={"Origin": "https://otro.example"}).status_code == 200

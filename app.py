@@ -16,6 +16,7 @@ import secrets
 import sqlite3
 import time
 from datetime import date, datetime, timedelta
+from urllib.parse import urlsplit
 
 from flask import Flask, g, jsonify, request, send_from_directory
 from werkzeug.security import check_password_hash, generate_password_hash
@@ -258,6 +259,21 @@ def create_app(config=None):
         return hmac.compare_digest(a.encode("utf-8"), b.encode("utf-8"))
 
     @app.before_request
+    def proteger_csrf():
+        """Defensa CSRF: una petición que cambia datos (POST/PUT/PATCH/DELETE) hecha desde un navegador
+        solo se acepta si viene de esta misma página. Los navegadores siempre envían Origin (o al menos
+        Sec-Fetch-Site) en esas peticiones, así que otra web no puede usar la sesión del usuario.
+        Los clientes sin navegador (curl, pruebas) no envían esos datos y no tienen cookie que robar."""
+        if request.method in ("GET", "HEAD", "OPTIONS"):
+            return None
+        origen = request.headers.get("Origin")
+        if origen is not None and urlsplit(origen).netloc != request.host:
+            raise ErrorApi(403, "Petición rechazada: el origen no coincide con el sitio")
+        if request.headers.get("Sec-Fetch-Site", "same-origin") not in ("same-origin", "none"):
+            raise ErrorApi(403, "Petición rechazada: viene de otro sitio")
+        return None
+
+    @app.before_request
     def autenticar():
         if request.endpoint in RUTAS_PUBLICAS:
             return None
@@ -408,7 +424,7 @@ def create_app(config=None):
 
     # ------------------------------------------------------------ cuentas de cliente (tienda)
     intentos = {}                                   # (ip, correo) -> momentos de intentos fallidos
-    hash_falso = generate_password_hash("no-existe")  # para que "correo no existe" tarde lo mismo
+    hash_falso = generate_password_hash(secrets.token_urlsafe(16))  # al azar en cada arranque; para que "correo no existe" tarde lo mismo
 
     def _hash_token(token):
         return hashlib.sha256(token.encode("utf-8")).hexdigest()
