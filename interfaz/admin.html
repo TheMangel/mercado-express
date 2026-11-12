@@ -174,6 +174,7 @@ dialog::backdrop{background:rgba(11,32,39,.55)}
     <button class="item" data-v="clientes">Clientes</button>
     <button class="item" data-v="productos">Productos</button>
     <button class="item" data-v="pedidos">Pedidos</button>
+    <button class="item" data-v="turnos">Turnos</button>
     <button class="item" data-v="reportes">Reportes</button>
     <button class="item" data-v="auditoria" id="navAud" hidden>Auditoría</button>
     <a class="item" href="/admin/catalogo">Catálogo (crear productos)</a>
@@ -209,7 +210,7 @@ async function api(ruta, {metodo = "GET", cuerpo} = {}) {
     return {ok: false, status: 0, datos: {error: "No se pudo conectar con la API. ¿Sigue corriendo python app.py?"}};
   }
   let datos = null; try { datos = await r.json(); } catch (e) {}
-  if (r.status === 401 && CLAVE) cerrarSesion("La clave ya no es válida. Entra de nuevo.");
+  if (r.status === 401 && CLAVE && !ruta.includes("/admin/turnos")) cerrarSesion("La clave ya no es válida. Entra de nuevo.");
   return {ok: r.ok, status: r.status, datos};
 }
 
@@ -261,6 +262,7 @@ async function entrar(clave) {
   return r;
 }
 function cerrarSesion(mensaje) {
+  if (window.timerTurnos) { clearInterval(window.timerTurnos); window.timerTurnos = null; }
   CLAVE = ""; ES_ADMIN = false; guardarClave("");
   if (dlg.open) dlg.close();
   $("#app").hidden = true; $("#acceso").hidden = false; $("#clave").value = "";
@@ -277,6 +279,7 @@ $("#salir").addEventListener("click", () => cerrarSesion());
 
 document.querySelectorAll("nav.lateral button.item").forEach(b => b.addEventListener("click", () => ir(b.dataset.v)));
 function ir(v) {
+  if (window.timerTurnos) { clearInterval(window.timerTurnos); window.timerTurnos = null; }
   VISTA = v;
   document.querySelectorAll("nav.lateral button.item").forEach(b => b.setAttribute("aria-current", b.dataset.v === v ? "page" : "false"));
   vistas[v]();
@@ -423,7 +426,7 @@ async function detallePedido(id) {
   cuerpo.innerHTML = `<dl class="dato"><dt>Cliente</dt><dd><span class="id">${esc(p.customer_id)}</span></dd><dt>Fecha del pedido</dt><dd>${esc(p.fecha_pedido)}</dd>
     <dt>Fecha de envío</dt><dd>${esc(p.fecha_envio || "—")}</dd><dt>Modo de envío</dt><dd>${esc(p.modo_envio)}</dd></dl>
     <div class="tabla-caja"><table><thead><tr><th>Producto</th><th class="r">Cant.</th><th class="r">Desc.</th><th class="r">Ventas</th><th class="r">Ganancia</th></tr></thead><tbody>
-    ${p.items.map(i => `<tr><td>${esc(i.producto)}<br><span class="id">${esc(i.product_id)}</span></td><td class="r">${entero(i.cantidad)}</td><td class="r">${Math.round((i.descuento || 0) * 100)}%</td><td class="r">${usd(i.ventas)}</td><td class="r">${usd(i.ganancia)}</td></tr>`).join("")}
+    ${p.items.map(i => `<tr><td>${esc(i.producto)}</td><td class="r">${entero(i.cantidad)}</td><td class="r">${Math.round((i.descuento || 0) * 100)}%</td><td class="r">${usd(i.ventas)}</td><td class="r">${usd(i.ganancia)}</td></tr>`).join("")}
     </tbody></table></div><div class="total-fila"><span>Total de ventas</span><b>${usd(p.total_ventas)}</b></div>`;
 }
 
@@ -535,7 +538,203 @@ async function vAuditoria() {
     : `<div class="tabla-caja"><div class="vacio">Todavía no hay accesos a datos completos. Aparecerán cuando uses “Ver datos completos”.</div></div>`;
 }
 
-const vistas = {resumen: vResumen, clientes: vClientes, productos: vProductos, pedidos: vPedidos, reportes: vReportes, auditoria: vAuditoria};
+/* ================= TURNOS ================= */
+async function vTurnos() {
+  main.innerHTML = `<div class="vista-cab">
+    <div><h1>Turnos</h1><p class="sub">Gestión de turnos y estado de las filas en tiempo real.</p></div>
+    <div style="display:flex;gap:8px;align-items:center">
+      <span class="nota" id="turnosReloj">Actualizando cada 5s</span>
+      <button class="btn sec" id="recTurnos">Actualizar</button>
+    </div>
+  </div>
+  <div id="turnosCont">Cargando turnos…</div>`;
+
+  $("#recTurnos").addEventListener("click", () => cargarTurnos(true));
+
+  async function cargarTurnos(manual = false) {
+    if (VISTA !== "turnos") return;
+    const cont = $("#turnosCont");
+    if (!cont) return;
+    const r = await api("/admin/turnos/api/lista");
+    if (r.status === 401 || r.status === 403) {
+      if (window.timerTurnos) { clearInterval(window.timerTurnos); window.timerTurnos = null; }
+      cont.innerHTML = `<div class="aviso error"><b>Acceso restringido:</b> Se requiere una sesión con cuenta de rol administrador para ver y gestionar los turnos.</div>
+        <form class="acceso-caja" id="formAdminSesion" style="margin:20px 0;width:min(400px,100%)">
+          <h3>Iniciar sesión como administrador</h3>
+          <p class="sub" style="margin-bottom:14px">Usa las credenciales de tu cuenta de administrador.</p>
+          <label for="admEmail">Correo electrónico</label>
+          <input type="text" id="admEmail" required placeholder="admin@example.com" style="margin-bottom:10px">
+          <label for="admPass">Contraseña</label>
+          <input type="password" id="admPass" required placeholder="••••••••" style="margin-bottom:14px">
+          <div id="errAdm" class="aviso error" hidden style="margin-bottom:12px"></div>
+          <button class="btn" style="width:100%" type="submit">Entrar a turnos</button>
+        </form>`;
+      const form = $("#formAdminSesion");
+      if (form) {
+        form.addEventListener("submit", async ev => {
+          ev.preventDefault();
+          const errEl = $("#errAdm");
+          const email = $("#admEmail").value.trim(), password = $("#admPass").value;
+          const res = await api("/admin/entrar", {metodo: "POST", cuerpo: {email, password}});
+          if (!res.ok) {
+            errEl.hidden = false;
+            errEl.textContent = res.datos?.error || "Error al iniciar sesión como administrador";
+          } else {
+            vTurnos();
+          }
+        });
+      }
+      return;
+    }
+    if (!r.ok) {
+      cont.innerHTML = avisoError(r);
+      return;
+    }
+
+    const servicios = r.datos || [];
+    if (!servicios.length) {
+      cont.innerHTML = `<div class="tabla-caja"><div class="vacio">No hay servicios de turnos configurados.</div></div>`;
+      return;
+    }
+
+    let html = "";
+    for (const s of servicios) {
+      const turnosActivos = s.turnos || s.activos || [];
+      const finalizados = s.finalizados || [];
+
+      html += `<section class="rep" style="margin-bottom:24px">
+        <header style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:12px;border-bottom:1px solid var(--line);padding-bottom:14px;margin-bottom:16px">
+          <div>
+            <h2>${esc(s.nombre)}</h2>
+            <p class="sub">Configuración: <b>${s.asesores} ${s.asesores === 1 ? "asesor" : "asesores"}</b> · Meta de espera: <b>${s.meta_espera_min} min</b></p>
+          </div>
+          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+            <button class="btn" data-llamar="${s.id}">Llamar siguiente</button>
+            <button class="btn sec" data-finalizar="${s.id}">Finalizar</button>
+          </div>
+        </header>
+
+        <!-- Métricas de capacidad y recomendación -->
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin-bottom:16px">
+          <div style="background:var(--well);border-radius:8px;padding:10px 14px">
+            <div style="font-size:.8rem;color:var(--ink-2)">En espera</div>
+            <div style="font-size:1.35rem;font-weight:700" class="num">${s.en_espera}</div>
+          </div>
+          <div style="background:var(--well);border-radius:8px;padding:10px 14px">
+            <div style="font-size:.8rem;color:var(--ink-2)">Turno en atención</div>
+            <div style="font-size:1.35rem;font-weight:700" class="num">${esc(s.turno_actual)}</div>
+          </div>
+          <div style="background:var(--well);border-radius:8px;padding:10px 14px">
+            <div style="font-size:.8rem;color:var(--ink-2)">Espera estimada</div>
+            <div style="font-size:1.35rem;font-weight:700" class="num">${s.tiempo_estimado_minutos} min</div>
+          </div>
+          <div style="background:var(--well);border-radius:8px;padding:10px 14px">
+            <div style="font-size:.8rem;color:var(--ink-2)">Asesores recomendados</div>
+            <div style="font-size:1.35rem;font-weight:700;color:var(--teal-dark)" class="num">${s.asesores_recomendados}</div>
+          </div>
+        </div>
+        ${s.alerta ? `<div class="aviso ${s.estable ? 'ok' : 'error'}" style="margin-bottom:16px">${esc(s.alerta)}</div>` : ''}
+
+        <!-- Turnos en espera y atención -->
+        <h3 style="margin:16px 0 8px">Fila de espera y atención (${turnosActivos.length})</h3>
+        <div class="tabla-caja" style="margin-bottom:20px">
+          ${turnosActivos.length ? `<table>
+            <thead>
+              <tr>
+                <th>Número</th>
+                <th>Estado</th>
+                <th>Cliente</th>
+                <th>Motivo y consulta</th>
+                <th>Hora de llegada</th>
+                <th class="r">Minutos esperando</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${turnosActivos.map(t => {
+                const esAtendiendo = t.estado === "atendiendo";
+                const estadoTxt = esAtendiendo ? "Atendiendo" : "En espera";
+                const badgeStyle = esAtendiendo ? "background:var(--ok-bg);color:var(--ok);font-weight:600;padding:2px 8px;border-radius:4px" : "background:var(--teal-soft);color:var(--teal-dark);font-weight:600;padding:2px 8px;border-radius:4px";
+                return `<tr>
+                  <td><b>#${t.numero}</b></td>
+                  <td><span style="${badgeStyle}">${estadoTxt}</span></td>
+                  <td>${t.cliente_nombre ? esc(t.cliente_nombre) : `<span style="color:var(--ink-2)">(Sin cuenta)</span>`}</td>
+                  <td>
+                    <div><b>${esc(t.motivo || 'General')}</b></div>
+                    ${t.pedido_id ? `<div style="font-size:.8rem;color:var(--teal-dark);font-family:ui-monospace,monospace">Pedido: #${esc(t.pedido_id)}</div>` : ''}
+                    ${t.detalle ? `<div style="font-size:.82rem;color:var(--ink-2);margin-top:2px">${esc(t.detalle)}</div>` : ''}
+                  </td>
+                  <td class="num">${esc(t.hora_llegada)}</td>
+                  <td class="r num">${t.minutos_esperando} min</td>
+                </tr>`;
+              }).join("")}
+            </tbody>
+          </table>` : `<div class="vacio">No hay clientes en espera ni en atención en este servicio.</div>`}
+        </div>
+
+        <!-- Últimos 20 finalizados -->
+        <details>
+          <summary style="cursor:pointer;font-weight:600;color:var(--teal-dark);padding:6px 0">Últimos finalizados (${finalizados.length})</summary>
+          <div class="tabla-caja" style="margin-top:8px">
+            ${finalizados.length ? `<table>
+              <thead>
+                <tr>
+                  <th>Número</th>
+                  <th>Cliente</th>
+                  <th>Motivo y consulta</th>
+                  <th>Llegada</th>
+                  <th>Atención / Fin</th>
+                  <th class="r">Espera</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${finalizados.map(t => `<tr>
+                  <td><b>#${t.numero}</b></td>
+                  <td>${t.cliente_nombre ? esc(t.cliente_nombre) : `<span style="color:var(--ink-2)">(Sin cuenta)</span>`}</td>
+                  <td>
+                    <div><b>${esc(t.motivo || '—')}</b></div>
+                    ${t.pedido_id ? `<div style="font-size:.8rem;color:var(--teal-dark);font-family:ui-monospace,monospace">Pedido: #${esc(t.pedido_id)}</div>` : ''}
+                    ${t.detalle ? `<div style="font-size:.82rem;color:var(--ink-2);margin-top:2px">${esc(t.detalle)}</div>` : ''}
+                  </td>
+                  <td class="num">${esc(t.hora_llegada)}</td>
+                  <td class="num">${t.fecha_fin ? esc(t.fecha_fin.slice(11,16)) : "—"}</td>
+                  <td class="r num">${t.minutos_esperando} min</td>
+                </tr>`).join("")}
+              </tbody>
+            </table>` : `<div class="vacio">Aún no hay turnos finalizados en este servicio.</div>`}
+          </div>
+        </details>
+      </section>`;
+    }
+
+    cont.innerHTML = html;
+
+    cont.querySelectorAll("[data-llamar]").forEach(btn => {
+      btn.addEventListener("click", async () => {
+        btn.disabled = true;
+        const res = await api("/admin/turnos/api/llamar", {metodo: "POST", cuerpo: {servicio_id: Number(btn.dataset.llamar)}});
+        btn.disabled = false;
+        if (!res.ok) alert(res.datos?.error || "Error al llamar siguiente turno");
+        cargarTurnos();
+      });
+    });
+
+    cont.querySelectorAll("[data-finalizar]").forEach(btn => {
+      btn.addEventListener("click", async () => {
+        btn.disabled = true;
+        const res = await api("/admin/turnos/api/finalizar", {metodo: "POST", cuerpo: {servicio_id: Number(btn.dataset.finalizar)}});
+        btn.disabled = false;
+        if (!res.ok) alert(res.datos?.error || "Error al finalizar turno");
+        cargarTurnos();
+      });
+    });
+  }
+
+  await cargarTurnos();
+  if (window.timerTurnos) clearInterval(window.timerTurnos);
+  window.timerTurnos = setInterval(cargarTurnos, 5000);
+}
+
+const vistas = {resumen: vResumen, clientes: vClientes, productos: vProductos, pedidos: vPedidos, turnos: vTurnos, reportes: vReportes, auditoria: vAuditoria};
 
 /* ================= arranque ================= */
 (async () => { const k = leerClave(); if (k) { const r = await entrar(k); if (!r.ok) cerrarSesion(); } })();

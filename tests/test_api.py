@@ -17,7 +17,7 @@ PRODUCTO = {"product_id": "FUR-BO-10001798", "product_name": "Bush Somerset Coll
 @pytest.fixture(scope="module")
 def app(tmp_path_factory):
     ruta = tmp_path_factory.mktemp("bd") / "test.db"
-    return create_app({"DB_PATH": str(ruta), "API_KEY": "clave-usuario", "ADMIN_KEY": "clave-admin",
+    return create_app({"CARGAR_DATASET": True, "DB_PATH": str(ruta), "API_KEY": "clave-usuario", "ADMIN_KEY": "clave-admin",
                        "TESTING": True})
 
 
@@ -261,7 +261,7 @@ def test_rollback_si_una_linea_falla_no_queda_pedido_fantasma(app, c):
     conn.execute("PRAGMA foreign_keys = ON")
     conn.execute("BEGIN")
     try:
-        conn.execute("INSERT INTO pedidos VALUES ('FANTASMA-1','2026-10-01','2026-10-05','Same Day','CG-12520')")
+        conn.execute("INSERT INTO pedidos (order_id, order_date, ship_date, ship_mode, customer_id) VALUES ('FANTASMA-1','2026-10-01','2026-10-05','Same Day','CG-12520')")
         conn.execute("INSERT INTO detalle_pedido (order_id, product_id, product_name, sales, quantity) "
                      "VALUES ('FANTASMA-1','FUR-BO-10001798','Bush Somerset Collection Bookcase',100,-5)")
         conn.execute("COMMIT")
@@ -321,7 +321,7 @@ ADM = {"nombre": "Admin Uno", "email": "admin1@example.com", "password": "clave-
 @pytest.fixture()
 def adm(tmp_path):
     """App nueva (base limpia) para no mezclar estos cambios con las otras pruebas."""
-    app = create_app({"DB_PATH": str(tmp_path / "adm.db"), "API_KEY": "clave-usuario", "ADMIN_KEY": "clave-admin",
+    app = create_app({"CARGAR_DATASET": True, "DB_PATH": str(tmp_path / "adm.db"), "API_KEY": "clave-usuario", "ADMIN_KEY": "clave-admin",
                       "TESTING": True})
     return app, app.test_client()
 
@@ -465,7 +465,7 @@ def test_catalogo_queda_auditado_y_el_texto_no_rompe_la_pagina(adm):
 def test_base_vieja_se_actualiza_sin_perder_datos(tmp_path):
     """Una base creada antes de esta versión (sin precio, rol ni categorías) se migra al arrancar."""
     ruta = tmp_path / "vieja.db"
-    create_app({"DB_PATH": str(ruta), "API_KEY": "a", "ADMIN_KEY": "b"})         # crea la base completa
+    create_app({"CARGAR_DATASET": True, "DB_PATH": str(ruta), "API_KEY": "a", "ADMIN_KEY": "b"})         # crea la base completa
     conn = sqlite3.connect(ruta)
     conn.executescript("""
         DROP TABLE subcategorias; DROP TABLE categorias;
@@ -476,7 +476,7 @@ def test_base_vieja_se_actualiza_sin_perder_datos(tmp_path):
         ALTER TABLE cuentas DROP COLUMN ciudad; ALTER TABLE cuentas DROP COLUMN direccion;
         ALTER TABLE cuentas DROP COLUMN codigo_postal;""")
     conn.commit(); conn.close()
-    app = create_app({"DB_PATH": str(ruta), "API_KEY": "a", "ADMIN_KEY": "b", "TESTING": True})
+    app = create_app({"CARGAR_DATASET": True, "DB_PATH": str(ruta), "API_KEY": "a", "ADMIN_KEY": "b", "TESTING": True})
     cli = app.test_client()
     assert len(cli.get("/tienda/categorias").get_json()) == 3
     assert cli.get("/tienda/productos?limite=1").get_json()["total"] > 1000      # todos quedan activos
@@ -831,11 +831,11 @@ def test_productos_del_dataset_empiezan_con_stock_0_y_se_les_puede_cargar(adm):
 
 def test_base_vieja_sin_stock_se_migra_con_cero(tmp_path):
     ruta = tmp_path / "sin_stock.db"
-    create_app({"DB_PATH": str(ruta), "API_KEY": "a", "ADMIN_KEY": "b"})
+    create_app({"CARGAR_DATASET": True, "DB_PATH": str(ruta), "API_KEY": "a", "ADMIN_KEY": "b"})
     conn = sqlite3.connect(ruta)
     conn.execute("ALTER TABLE productos DROP COLUMN stock")
     conn.commit(); conn.close()
-    create_app({"DB_PATH": str(ruta), "API_KEY": "a", "ADMIN_KEY": "b"})
+    create_app({"CARGAR_DATASET": True, "DB_PATH": str(ruta), "API_KEY": "a", "ADMIN_KEY": "b"})
     conn = sqlite3.connect(ruta)
     assert conn.execute("SELECT COUNT(*), MIN(stock), MAX(stock) FROM productos").fetchone()[1:] == (0, 0)
     conn.close()
@@ -860,3 +860,332 @@ def test_csrf_acepta_el_mismo_sitio_y_los_clientes_sin_navegador(c):
     assert c.post("/cuenta/entrar", json=malo).status_code == 401
     # Las lecturas (GET) nunca se bloquean
     assert c.get("/tienda/config", headers={"Origin": "https://otro.example"}).status_code == 200
+
+
+# ----------------------------------------------------------- base vacía (arranque por defecto)
+def test_base_nueva_arranca_vacia_y_todo_responde_sin_errores(tmp_path):
+    app = create_app({"DB_PATH": str(tmp_path / "vacia.db"), "API_KEY": "a", "ADMIN_KEY": "b", "TESTING": True})
+    c = app.test_client()
+    h = {"X-API-Key": "a"}
+    r = c.get("/resumen", headers=h).get_json()
+    assert r["clientes"] == 0 and r["pedidos"] == 0 and r["lineas_de_pedido"] == 0 and r["productos"] == 0
+    for ruta in ("/clientes", "/productos", "/pedidos"):
+        d = c.get(ruta, headers=h)
+        assert d.status_code == 200 and d.get_json()["total"] == 0
+    for ruta in ("/reportes/ventas-por-categoria", "/reportes/ganancia-por-cliente", "/reportes/envio-por-region"):
+        assert c.get(ruta, headers=h).status_code == 200, ruta
+    assert c.get("/tienda/productos").get_json()["total"] == 0
+
+
+# ----------------------------------------------------------- modelo de colas M/M/c (valores de la teoría)
+def test_colas_coincide_con_la_teoria():
+    from colas import erlang_c, espera_promedio_min, recomendar_asesores, analizar
+    # M/M/1 con utilización 0,5: probabilidad de esperar = 0,5 y espera promedio = 1 hora
+    assert erlang_c(0.5, 1, 1) == pytest.approx(0.5)
+    assert espera_promedio_min(0.5, 1, 1) == pytest.approx(60)
+    # M/M/2 con llegadas = servicio = 1: probabilidad 1/3 y espera 20 minutos
+    assert erlang_c(1, 1, 2) == pytest.approx(1 / 3)
+    assert espera_promedio_min(1, 1, 2) == pytest.approx(20)
+    # Si llegan más rápido de lo que se atiende, la fila crece sin límite
+    assert erlang_c(2, 1, 2) is None and espera_promedio_min(3, 1, 2) is None
+    # 30 llegadas/h y 20 atenciones/h por asesor: con 1 asesor es imposible, con 2 la espera es ~3,9 min
+    assert recomendar_asesores(30, 20, 5) == 2
+    assert recomendar_asesores(30, 20, 3) == 3
+    # Sin llegadas no hay espera
+    assert espera_promedio_min(0, 20, 1) == 0
+    a = analizar(30, 180, 1, 5, 4)                       # 30/h, 3 min por cliente, 1 asesor
+    assert a["estable"] is False and a["asesores_recomendados"] == 2 and a["espera_actual_min"] == 12
+
+
+# ----------------------------------------------------------- turnos y renombrar categorías (sección admin)
+@pytest.fixture()
+def tur(tmp_path):
+    app = create_app({"DB_PATH": str(tmp_path / "t.db"), "API_KEY": "u", "ADMIN_KEY": "clave-admin",
+                      "TESTING": True, "TURNOS_MAX_POR_IP": 3, "TURNOS_MAX_FILA": 4})
+    return app, app.test_client()
+
+
+def test_turnos_estado_publico_y_vacio(tur):
+    _, c = tur
+    r = c.get("/turnos/api/estado")
+    assert r.status_code == 200
+    servicios = r.get_json()
+    assert len(servicios) == 2 and all(s["en_espera"] == 0 and s["asesores"] == 1 for s in servicios)
+
+
+@pytest.mark.parametrize("cuerpo", [{}, {"servicio_id": 999}, {"servicio_id": [1]}, {"servicio_id": "1"},
+                                    {"servicio_id": True}, {"servicio_id": -3}, {"servicio_id": 1.5}])
+def test_pedir_turno_rechaza_servicios_invalidos(tur, cuerpo):
+    _, c = tur
+    r = c.post("/turnos/api/pedir", json=cuerpo)
+    assert r.status_code in (404, 422)
+    assert c.get("/turnos/api/estado").get_json()[0]["en_espera"] == 0     # no quedó ningún turno fantasma
+
+
+def test_pedir_turno_numera_en_orden_y_limita_el_abuso(tur):
+    _, c = tur
+    assert [c.post("/turnos/api/pedir", json={"servicio_id": 1, "motivo": "Estado de mi pedido"}).get_json()["numero"] for _ in range(3)] == [1, 2, 3]
+    r = c.post("/turnos/api/pedir", json={"servicio_id": 1, "motivo": "Estado de mi pedido"})                 # 4.º seguido desde el mismo equipo
+    assert r.status_code == 429
+    assert c.get("/turnos/api/estado").get_json()[0]["en_espera"] == 3
+
+
+def test_fila_llena_se_rechaza(tmp_path):
+    app = create_app({"DB_PATH": str(tmp_path / "f.db"), "API_KEY": "u", "ADMIN_KEY": "k", "TESTING": True,
+                      "TURNOS_MAX_POR_IP": 100, "TURNOS_MAX_FILA": 2})
+    c = app.test_client()
+    assert c.post("/turnos/api/pedir", json={"servicio_id": 1, "motivo": "Estado de mi pedido"}).status_code == 200
+    assert c.post("/turnos/api/pedir", json={"servicio_id": 1, "motivo": "Estado de mi pedido"}).status_code == 200
+    assert c.post("/turnos/api/pedir", json={"servicio_id": 1, "motivo": "Estado de mi pedido"}).status_code == 409
+    assert c.post("/turnos/api/pedir", json={"servicio_id": 2, "motivo": "Estado de mi pedido"}).status_code == 200   # otra fila sigue libre
+
+
+def test_llamar_turno_exige_admin_y_registra_atencion_y_fin(tur):
+    _, c = tur
+    c.post("/turnos/api/pedir", json={"servicio_id": 1, "motivo": "Estado de mi pedido"})
+    c.post("/turnos/api/pedir", json={"servicio_id": 1, "motivo": "Garantía o devolución"})
+    assert c.post("/admin/turnos/api/llamar", json={"servicio_id": 1}).status_code == 401   # sin sesión
+    assert c.post("/admin/registro", json=ADM).status_code == 201
+    r = c.post("/admin/turnos/api/llamar", json={"servicio_id": 1})
+    assert r.status_code == 200 and r.get_json()["numero"] == 1
+    e = c.get("/turnos/api/estado").get_json()[0]
+    assert e["turno_actual"] == 1 and e["en_espera"] == 1
+    r = c.post("/admin/turnos/api/llamar", json={"servicio_id": 1})                          # termina el 1, llama al 2
+    assert r.get_json()["numero"] == 2
+    r = c.post("/admin/turnos/api/llamar", json={"servicio_id": 1})                          # termina el 2, fila vacía
+    assert r.get_json()["numero"] is None
+    assert c.get("/turnos/api/estado").get_json()[0]["turno_actual"] == "-"
+    assert c.post("/admin/turnos/api/llamar", json={"servicio_id": 999}).status_code == 404
+
+
+def test_estimacion_usa_llegadas_duracion_y_asesores(tur):
+    app, c = tur
+    import sqlite3
+    from datetime import datetime, timedelta
+    ahora = datetime.now()
+    conn = sqlite3.connect(app.config["DB_PATH"])
+    # 12 turnos terminados en la última hora, cada uno de 6 minutos de atención
+    for i in range(12):
+        llegada = ahora - timedelta(minutes=55 - i * 4)
+        conn.execute("INSERT INTO turnos (servicio_id, numero, estado, fecha_llegada, fecha_atencion, fecha_fin) "
+                     "VALUES (1, ?, 'finalizado', ?, ?, ?)",
+                     (i + 1, llegada.isoformat(), llegada.isoformat(), (llegada + timedelta(minutes=6)).isoformat()))
+    conn.commit(); conn.close()
+    e = c.get("/turnos/api/estado").get_json()[0]
+    assert e["datos_suficientes"] is True
+    assert e["duracion_promedio_seg"] == 360 and e["llegadas_por_hora"] == 12
+    # 12 llegadas/h y 10 atenciones/h por asesor: con 1 asesor la fila crece sin parar
+    assert e["estable"] is False and e["asesores_recomendados"] >= 2 and "asesores" in e["alerta"]
+    assert c.post("/admin/registro", json=ADM).status_code == 201
+    r = c.put("/admin/turnos/api/servicio/1", json={"asesores": e["asesores_recomendados"], "meta_espera_min": 5})
+    assert r.status_code == 200
+    e2 = c.get("/turnos/api/estado").get_json()[0]
+    assert e2["estable"] is True and e2["espera_modelo_min"] <= 5
+
+
+@pytest.mark.parametrize("cuerpo", [{"asesores": 0}, {"asesores": 21}, {"asesores": "2"}, {"asesores": True},
+                                    {"meta_espera_min": 0}, {"meta_espera_min": 61}])
+def test_configurar_servicio_valida_y_exige_admin(tur, cuerpo):
+    _, c = tur
+    assert c.put("/admin/turnos/api/servicio/1", json={"asesores": 2}).status_code == 401
+    assert c.post("/admin/registro", json=ADM).status_code == 201
+    assert c.put("/admin/turnos/api/servicio/1", json=cuerpo).status_code == 422
+    assert c.put("/admin/turnos/api/servicio/999", json={"asesores": 2}).status_code == 404
+
+
+def test_renombrar_categoria_con_subcategorias_y_productos(tur):
+    _, c = tur
+    assert c.post("/admin/registro", json=ADM).status_code == 201
+    assert c.post("/admin/catalogo/categorias", json={"nombre": "Muebles", "tono": "mue"}).status_code == 201
+    assert c.post("/admin/catalogo/subcategorias", json={"categoria": "Muebles", "nombre": "Sillas", "icono": "chair"}).status_code == 201
+    r = c.put("/admin/catalogo/categorias/Muebles", json={"nuevo_nombre": "Hogar"})
+    assert r.status_code == 200, r.get_json()
+    arbol = c.get("/admin/catalogo/datos").get_json()["arbol"]
+    assert "Hogar" in str(arbol) and "Muebles" not in str(arbol) and "Sillas" in str(arbol)
+    r = c.put("/admin/catalogo/subcategorias/Hogar/Sillas", json={"nuevo_nombre": "Sillones"})
+    assert r.status_code == 200 and "Sillones" in str(c.get("/admin/catalogo/datos").get_json()["arbol"])
+
+
+@pytest.mark.parametrize("cuerpo", [{}, {"nuevo_nombre": ""}, {"nuevo_nombre": "x"}, {"nuevo_nombre": 12345},
+                                    {"nuevo_nombre": "x" * 300}])
+def test_renombrar_categoria_valida_el_nombre(tur, cuerpo):
+    _, c = tur
+    assert c.post("/admin/registro", json=ADM).status_code == 201
+    c.post("/admin/catalogo/categorias", json={"nombre": "Muebles", "tono": "mue"})
+    assert c.put("/admin/catalogo/categorias/Muebles", json=cuerpo).status_code == 422
+
+
+def test_renombrar_exige_admin_y_no_pisa_otra_categoria(tur):
+    _, c = tur
+    assert c.put("/admin/catalogo/categorias/Muebles", json={"nuevo_nombre": "Hogar"}).status_code == 401
+    assert c.post("/admin/registro", json=ADM).status_code == 201
+    c.post("/admin/catalogo/categorias", json={"nombre": "Muebles", "tono": "mue"})
+    c.post("/admin/catalogo/categorias", json={"nombre": "Hogar", "tono": "ofi"})
+    assert c.put("/admin/catalogo/categorias/Muebles", json={"nuevo_nombre": "hogar"}).status_code == 409
+    assert c.put("/admin/catalogo/categorias/Nada", json={"nuevo_nombre": "Otra"}).status_code == 404
+
+
+# ----------------------------------------------------------- catálogo de ejemplo (sembrar_datos.py)
+def test_sembrar_datos_carga_el_catalogo_completo_y_no_se_duplica(tmp_path):
+    from sembrar_datos import sembrar
+    ruta = str(tmp_path / "s.db")
+    assert sembrar(ruta, 3250) == 120
+    assert sembrar(ruta, 3250) == 0                                   # repetirlo no duplica nada
+    conn = sqlite3.connect(ruta)
+    por_categoria = dict(conn.execute("SELECT category, COUNT(*) FROM productos GROUP BY category"))
+    assert por_categoria == {"Hogar": 30, "Electrodomésticos": 30, "Tecnología": 30, "Moda": 30}
+    subs_moda = {r[0] for r in conn.execute("SELECT nombre FROM subcategorias WHERE categoria = 'Moda'")}
+    assert {"Ropa de mujer", "Ropa de hombre", "Calzado de mujer", "Calzado de hombre"} <= subs_moda
+    # cada producto apunta a una subcategoría que existe, con precio válido y stock no negativo
+    assert conn.execute("SELECT COUNT(*) FROM productos p LEFT JOIN subcategorias s "
+                        "ON s.categoria = p.category AND s.nombre = p.sub_category WHERE s.nombre IS NULL").fetchone()[0] == 0
+    assert conn.execute("SELECT COUNT(*) FROM productos WHERE precio <= 0 OR stock < 0 OR activo != 1").fetchone()[0] == 0
+    assert conn.execute("SELECT COUNT(*) FROM productos WHERE stock = 0").fetchone()[0] >= 1      # hay agotados de ejemplo
+    # el precio en COP de la lista se recupera exacto con la tasa
+    cop = conn.execute("SELECT ROUND(precio * 3250) FROM productos WHERE product_name = 'Jean tiro alto skinny'").fetchone()[0]
+    assert cop == 139900
+    conn.close()
+
+
+def test_tienda_muestra_el_catalogo_sembrado(tmp_path):
+    from sembrar_datos import sembrar
+    ruta = str(tmp_path / "t.db")
+    sembrar(ruta, 3250)
+    c = create_app({"DB_PATH": ruta, "API_KEY": "a", "ADMIN_KEY": "b", "TESTING": True}).test_client()
+    d = c.get("/tienda/productos?limite=100").get_json()
+    assert d["total"] == 120 and all(p["precio"] > 0 for p in d["resultados"])
+    cats = {k["categoria"]: k["productos"] for k in c.get("/tienda/categorias").get_json()}
+    assert cats == {"Hogar": 30, "Electrodomésticos": 30, "Tecnología": 30, "Moda": 30}
+
+
+# ----------------------------------------------------------- envío: costo, despacho y llegada estimada (envio.py)
+def test_festivos_de_colombia_2026():
+    from datetime import date
+    from envio import festivos
+    f = festivos(2026)
+    esperados = {"2026-01-01", "2026-01-12", "2026-03-23", "2026-04-02", "2026-04-03", "2026-05-01", "2026-05-18",
+                 "2026-06-08", "2026-06-15", "2026-06-29", "2026-07-20", "2026-08-07", "2026-08-17", "2026-10-12",
+                 "2026-11-02", "2026-11-16", "2026-12-08", "2026-12-25"}
+    assert {d.isoformat() for d in f} == esperados
+    assert date(2026, 11, 16) not in {d for d in f if d.weekday() >= 5}   # todos los festivos de 2026 caen en día hábil
+
+
+def test_envio_salta_festivos_y_fines_de_semana():
+    from datetime import date, datetime
+    from envio import cotizar, sumar_habiles
+    assert sumar_habiles(date(2026, 11, 13), 1) == date(2026, 11, 17)     # viernes + 1 hábil: el lunes 16 es festivo
+    assert sumar_habiles(date(2026, 11, 14), 0) == date(2026, 11, 17)     # sábado: pasa al siguiente hábil
+    r = cotizar("Colombia", "Antioquia", "Medellín", 0, datetime(2026, 11, 10, 10, 0))   # martes 10:00
+    ex = {o["id"]: o for o in r["opciones"]}
+    assert r["zona"] == "nacional" and r["origen"] == "Montería, Córdoba"
+    assert ex["express"]["despacho"] == "2026-11-11"                       # 1 día hábil de alistamiento
+    assert (ex["express"]["entrega_desde"], ex["express"]["entrega_hasta"]) == ("2026-11-13", "2026-11-17")
+    assert (ex["estandar"]["entrega_desde"], ex["estandar"]["entrega_hasta"]) == ("2026-11-17", "2026-11-20")
+    assert ex["estandar"]["costo_cop"] == 17_900 and ex["estandar"]["gratis"] is False
+    assert [o["id"] for o in r["opciones"]] == ["express", "estandar"]    # la más rápida primero
+
+
+@pytest.mark.parametrize("pais,region,ciudad,zona", [
+    ("Colombia", "Córdoba", "Montería", "local"), ("Colombia", "Córdoba", "monteria", "local"),   # sin tildes ni mayúsculas
+    ("Colombia", "Córdoba", "Lorica", "regional"), ("Colombia", "Atlántico", "Barranquilla", "costa"),
+    ("Colombia", "Antioquia", "Medellín", "nacional"), ("Colombia", "Amazonas", "Leticia", "especial"),
+    ("España", "", "Madrid", "internacional")])
+def test_envio_zonas(pais, region, ciudad, zona):
+    from envio import zona_de
+    assert zona_de(pais, region, ciudad) == zona
+
+
+def test_envio_gratis_hora_de_corte_e_internacional():
+    from datetime import datetime
+    from envio import cotizar
+    # Compras desde 200.000 COP: el estándar sale gratis (el express no)
+    r = cotizar("Colombia", "Antioquia", "Medellín", 200_000, datetime(2026, 11, 10, 10, 0))
+    ex = {o["id"]: o for o in r["opciones"]}
+    assert ex["estandar"]["gratis"] is True and ex["estandar"]["costo_cop"] == 0 and ex["express"]["costo_cop"] == 27_900
+    # "Mismo día": solo en Montería, en día hábil y antes de las 2:00 p. m.
+    ids = lambda cuando: [o["id"] for o in cotizar("Colombia", "Córdoba", "Montería", 0, cuando)["opciones"]]
+    assert "mismo_dia" in ids(datetime(2026, 11, 10, 13, 59))
+    assert "mismo_dia" not in ids(datetime(2026, 11, 10, 14, 0))           # pasó la hora de corte
+    assert "mismo_dia" not in ids(datetime(2026, 11, 14, 9, 0))            # sábado
+    assert "mismo_dia" not in ids(datetime(2026, 11, 16, 9, 0))            # festivo
+    r = cotizar("España", "", "Madrid", 900_000, datetime(2026, 11, 10, 10, 0))
+    assert [o["id"] for o in r["opciones"]] == ["internacional"] and r["envio_gratis_desde_cop"] is None
+    assert r["opciones"][0]["costo_cop"] == 120_000                         # nunca gratis fuera de Colombia
+
+
+def test_ruta_tienda_envio_es_publica_y_valida_los_datos(c):
+    r = c.get("/tienda/envio?pais=Colombia&region=Antioquia&ciudad=Medell%C3%ADn&subtotal_cop=150000")   # sin clave: es pública
+    assert r.status_code == 200
+    d = r.get_json()
+    assert d["zona"] == "nacional" and d["opciones"] and d["hora_de_corte"] == 14
+    assert {"id", "costo_cop", "gratis", "despacho", "entrega_desde", "entrega_hasta", "alistamiento_dias",
+            "transito_min", "transito_max"} <= set(d["opciones"][0])
+    for q in ("", "?pais=Narnia", "?pais=Colombia&subtotal_cop=abc", "?pais=Colombia&subtotal_cop=-5",
+              "?pais=Colombia&subtotal_cop=99999999999999"):
+        assert c.get("/tienda/envio" + q).status_code == 422, q
+
+
+def test_admin_turnos_lista_y_finalizar(tur):
+    app, c = tur
+    # 1. Sin sesión de admin da 401
+    assert c.get("/admin/turnos/api/lista").status_code == 401
+    assert c.post("/admin/turnos/api/finalizar", json={"servicio_id": 1}).status_code == 401
+
+    # 2. Cliente normal da 403
+    assert c.post("/cuenta/registro", json=dict(CUENTA, email="cli_turno@example.com")).status_code == 201
+    assert c.get("/admin/turnos/api/lista").status_code == 403
+    assert c.post("/admin/turnos/api/finalizar", json={"servicio_id": 1}).status_code == 403
+
+    # Pedir turno con sesión iniciada de cliente (se liga a cuenta_id)
+    r_pedir = c.post("/turnos/api/pedir", json={"servicio_id": 1, "motivo": "Estado de mi pedido"})
+    assert r_pedir.status_code == 200
+    num_cliente = r_pedir.get_json()["numero"]
+
+    # Salir de cliente y pedir turno anónimo
+    c.post("/cuenta/salir")
+    r_pedir_anon = c.post("/turnos/api/pedir", json={"servicio_id": 1, "motivo": "Información de un producto"})
+    assert r_pedir_anon.status_code == 200
+    num_anon = r_pedir_anon.get_json()["numero"]
+
+    # Iniciar sesión como admin
+    assert c.post("/admin/registro", json=ADM).status_code == 201
+
+    # Consultar lista
+    r_lista = c.get("/admin/turnos/api/lista")
+    assert r_lista.status_code == 200
+    servicios = r_lista.get_json()
+    assert len(servicios) == 2
+    s1 = next(s for s in servicios if s["id"] == 1)
+    assert s1["en_espera"] == 2
+    assert "asesores" in s1 and "meta_espera_min" in s1 and "asesores_recomendados" in s1
+    assert len(s1["turnos"]) == 2
+
+    # Verificar datos del turno del cliente (con nombre, SIN telefono ni correo)
+    t_cli = next(t for t in s1["turnos"] if t["numero"] == num_cliente)
+    assert t_cli["estado"] == "espera"
+    assert t_cli["cliente_nombre"] is not None
+    assert "Ana" in t_cli["cliente_nombre"]
+    assert "telefono" not in t_cli and "email" not in t_cli and "correo" not in t_cli
+    assert "hora_llegada" in t_cli and "minutos_esperando" in t_cli
+
+    # Turno anónimo no tiene nombre
+    t_anon = next(t for t in s1["turnos"] if t["numero"] == num_anon)
+    assert t_anon["cliente_nombre"] is None
+
+    # Llamar siguiente turno
+    r_llam = c.post("/admin/turnos/api/llamar", json={"servicio_id": 1})
+    assert r_llam.status_code == 200 and r_llam.get_json()["numero"] == num_cliente
+
+    # Lista ahora muestra num_cliente en atendiendo
+    s1_act = c.get("/admin/turnos/api/lista").get_json()[0]
+    t_atendiendo = next(t for t in s1_act["turnos"] if t["numero"] == num_cliente)
+    assert t_atendiendo["estado"] == "atendiendo"
+
+    # Finalizar turno en atención
+    r_fin = c.post("/admin/turnos/api/finalizar", json={"servicio_id": 1})
+    assert r_fin.status_code == 200
+
+    # Lista ahora muestra 1 en espera y num_cliente en finalizados
+    s1_post = c.get("/admin/turnos/api/lista").get_json()[0]
+    assert s1_post["en_espera"] == 1
+    assert any(t["numero"] == num_cliente and t["estado"] == "finalizado" for t in s1_post["finalizados"])

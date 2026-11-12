@@ -21,6 +21,24 @@ COLUMNAS_PERFIL = {
     "direccion":     "TEXT",
     "codigo_postal": "TEXT CHECK (codigo_postal IS NULL OR length(codigo_postal) BETWEEN 3 AND 10)",
 }
+# Capacidad de cada servicio de turnos (migrar() las agrega a bases que ya tenían la tabla sin ellas).
+COLUMNAS_SERVICIO = {
+    "asesores":        "INTEGER NOT NULL DEFAULT 1 CHECK (asesores BETWEEN 1 AND 20)",           # atendiendo a la vez
+    "meta_espera_min": "INTEGER NOT NULL DEFAULT 5 CHECK (meta_espera_min BETWEEN 1 AND 60)",   # espera aceptable
+}
+# Columnas que se agregaron después a pedidos (para bases que ya existían).
+COLUMNAS_PEDIDO = {
+    "creado": "TEXT",
+    "envio_cop": "INTEGER",
+    "cancelado_en": "TEXT",
+    "dest_pais": "TEXT",
+    "dest_region": "TEXT",
+    "dest_ciudad": "TEXT",
+    "dest_direccion": "TEXT",
+    "dest_codigo_postal": "TEXT",
+    "dest_telefono": "TEXT",
+}
+
 _PERFIL_SQL = ",\n    ".join(f"{col:<18} {definicion}" for col, definicion in COLUMNAS_PERFIL.items()) + ","
 
 SCHEMA = """
@@ -45,6 +63,9 @@ CREATE TABLE IF NOT EXISTS productos (
     precio       REAL CHECK (precio IS NULL OR precio > 0),  -- NULL = precio deducido del historial de ventas
     activo       INTEGER NOT NULL DEFAULT 1 CHECK (activo IN (0,1)),  -- 0 = oculto en la tienda (no se borra si tiene ventas)
     stock        INTEGER NOT NULL DEFAULT 0 CHECK (stock >= 0),       -- unidades disponibles (nunca negativo)
+    marca        TEXT,
+    descripcion  TEXT,
+    ficha        TEXT,
     PRIMARY KEY (product_id, product_name)   -- llave compuesta: un mismo ID se usó para 2 productos
 );
 
@@ -70,6 +91,15 @@ CREATE TABLE IF NOT EXISTS pedidos (
     ship_date   TEXT,
     ship_mode   TEXT,
     customer_id TEXT NOT NULL,
+    creado      TEXT,       -- momento exacto en que la tienda guardó el pedido (los pedidos viejos no lo tienen)
+    envio_cop   INTEGER,    -- lo que se cobró por el envío (no cambia si el cliente modifica el pedido)
+    cancelado_en TEXT,      -- si tiene fecha, el pedido está cancelado y no cuenta en los reportes
+    dest_pais   TEXT,
+    dest_region TEXT,
+    dest_ciudad TEXT,
+    dest_direccion TEXT,
+    dest_codigo_postal TEXT,
+    dest_telefono TEXT,
     FOREIGN KEY (customer_id) REFERENCES clientes(customer_id)
 );
 
@@ -114,6 +144,48 @@ CREATE TABLE IF NOT EXISTS sesiones (
     expira     TEXT NOT NULL,
     FOREIGN KEY (cuenta_id) REFERENCES cuentas(id) ON DELETE CASCADE
 );
+
+-- Turnos (actividad 9): cada turno guarda llegada, inicio de atención y fin; de ahí salen duraciones y tasas
+CREATE TABLE IF NOT EXISTS turnos_servicios (
+    id              INTEGER PRIMARY KEY,
+    nombre          TEXT NOT NULL UNIQUE,
+    activo          INTEGER NOT NULL DEFAULT 1 CHECK (activo IN (0,1)),
+    asesores        INTEGER NOT NULL DEFAULT 1 CHECK (asesores BETWEEN 1 AND 20),
+    meta_espera_min INTEGER NOT NULL DEFAULT 5 CHECK (meta_espera_min BETWEEN 1 AND 60)
+);
+
+CREATE TABLE IF NOT EXISTS turnos (
+    id             INTEGER PRIMARY KEY,
+    servicio_id    INTEGER NOT NULL,
+    numero         INTEGER NOT NULL,
+    estado         TEXT NOT NULL DEFAULT 'espera' CHECK (estado IN ('espera','atendiendo','finalizado')),
+    fecha_llegada  TEXT NOT NULL,
+    fecha_atencion TEXT,
+    fecha_fin      TEXT,
+    cuenta_id      INTEGER,
+    motivo         TEXT,
+    detalle        TEXT,
+    pedido_id      TEXT,
+    FOREIGN KEY (servicio_id) REFERENCES turnos_servicios(id),
+    FOREIGN KEY (cuenta_id) REFERENCES cuentas(id)
+);
+CREATE INDEX IF NOT EXISTS idx_turnos_servicio_estado ON turnos(servicio_id, estado);
+CREATE INDEX IF NOT EXISTS idx_turnos_llegada ON turnos(servicio_id, fecha_llegada);
+
+-- Pagos de la tienda (pasarela simulada). NUNCA se guarda el número de tarjeta ni el CVV: solo marca y últimos 4.
+CREATE TABLE IF NOT EXISTS pagos (
+    pago_id   TEXT PRIMARY KEY,
+    cuenta_id INTEGER NOT NULL,
+    monto_cop INTEGER NOT NULL CHECK (monto_cop > 0),
+    estado    TEXT NOT NULL CHECK (estado IN ('aprobado','rechazado','reembolsado')),
+    motivo    TEXT,                    -- por qué se rechazó o se reembolsó
+    marca     TEXT,
+    ultimos4  TEXT,
+    creado    TEXT NOT NULL,
+    order_id  TEXT,                    -- se llena cuando el pago aprobado se usa en un pedido (un pago = un pedido)
+    FOREIGN KEY (cuenta_id) REFERENCES cuentas(id)
+);
+CREATE INDEX IF NOT EXISTS idx_pagos_cuenta ON pagos(cuenta_id);
 
 CREATE INDEX IF NOT EXISTS idx_detalle_order_id ON detalle_pedido(order_id);
 CREATE INDEX IF NOT EXISTS idx_pedidos_customer_id ON pedidos(customer_id);

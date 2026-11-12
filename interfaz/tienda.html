@@ -305,6 +305,16 @@ dialog[open]::backdrop{background:rgba(8,5,14,.38);backdrop-filter:blur(12px);-w
 .det .id{font-family:ui-monospace,Consolas,monospace;font-size:.82rem;color:var(--muted)}
 .det .precio{font-size:2.4rem;margin:10px 0 4px}
 .det .acc{display:flex;gap:10px;align-items:center;margin-top:18px;flex-wrap:wrap}
+.det-marca{text-transform:uppercase;font-size:.8rem;font-weight:700;letter-spacing:.05em;color:var(--muted);display:block;margin-bottom:2px}
+.det-desc{margin:12px 0 16px;font-size:.95rem;line-height:1.55;color:var(--txt)}
+.det-ficha{margin-top:18px;padding-top:16px;border-top:1px solid var(--linea)}
+.det-ficha h3{font-size:1.05rem;font-weight:700;margin:0 0 10px;font-family:var(--display)}
+.tabla-ficha{width:100%;border-collapse:collapse;font-size:.88rem;border-radius:12px;overflow:hidden}
+.tabla-ficha tr:nth-child(odd){background:var(--vidrio)}
+.tabla-ficha tr:nth-child(even){background:transparent}
+.tabla-ficha th,.tabla-ficha td{padding:8px 12px;text-align:left;vertical-align:top;border-bottom:1px solid var(--linea)}
+.tabla-ficha th{color:var(--muted);font-weight:500;width:40%}
+.tabla-ficha td{color:var(--txt);font-weight:400}
 .cfg-grupo{margin-bottom:20px}
 .cfg-tit{font-weight:700;margin:0}
 .campo{display:grid;gap:6px;margin-bottom:14px}
@@ -326,6 +336,16 @@ dialog[open]::backdrop{background:rgba(8,5,14,.38);backdrop-filter:blur(12px);-w
 .op-envio:has(input:checked){border-color:var(--naranja);background:var(--vidrio-2);box-shadow:0 0 0 1px var(--naranja)}
 .op-envio input{accent-color:var(--naranja);margin-top:5px;flex:none}
 .op-envio small{display:block;color:var(--muted);font-size:.86rem}
+.op-envio .op-info{flex:1;min-width:0}
+.op-envio .costo{margin-left:auto;white-space:nowrap;color:var(--precio);font-variant-numeric:tabular-nums}
+.op-envio small b{color:var(--txt);font-weight:600}
+.tot-env{border-top:1px solid var(--linea);margin:6px 0 14px;padding-top:10px}
+.tot-env div{display:flex;justify-content:space-between;gap:12px;padding:3px 0;color:var(--muted)}
+.tot-env b{color:var(--txt);font-variant-numeric:tabular-nums}
+.tot-env .gran{border-top:1px dashed var(--linea);margin-top:6px;padding-top:8px;font-size:1.1rem}
+.tot-env .gran b{color:var(--precio)}
+.notas-env{margin:0 0 14px 18px;color:var(--muted);font-size:.86rem;display:grid;gap:4px}
+.zona-env{display:inline-block;margin-top:6px;padding:2px 10px;border-radius:999px;border:1px solid var(--linea);font-size:.8rem;color:var(--muted)}
 .resumen-dir{background:var(--vidrio);border:1px solid var(--linea);border-radius:22px;padding:14px 18px;margin:14px 0}
 .resumen-dir p{margin-top:4px}
 #auth{width:min(560px,94vw)}
@@ -382,6 +402,16 @@ dialog[open]::backdrop{background:rgba(8,5,14,.38);backdrop-filter:blur(12px);-w
     <button class="rail-b" data-accion="carrito" data-i18n-aria="abrirCarrito" data-i18n-title="carrito">
       <svg class="i" viewBox="0 0 24 24"><path d="M3 4h2.5l2.2 11h10.1l2-8H7"/><circle cx="9.5" cy="19.5" r="1.4"/><circle cx="17" cy="19.5" r="1.4"/></svg>
       <span class="badge" data-badge hidden>0</span></button>
+    <button class="rail-b" onclick="window.location.href='/turnos'" data-i18n-aria="turnos" data-i18n-title="Fila / Recogida">
+      <!-- Icono de un reloj/ticket para la fila -->
+      <svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"></path>
+        <path d="M14 2v4a2 2 0 0 0 2 2h4"></path>
+        <path d="M10 9H8"></path>
+        <path d="M16 13H8"></path>
+        <path d="M16 17H8"></path>
+      </svg>
+    </button>
     <span class="rail-esp"></span>
     <button class="rail-b" data-accion="config" data-i18n-aria="config" data-i18n-title="config">
       <svg class="i" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg></button>
@@ -515,6 +545,7 @@ const I18N = {
     quitarUna: "Quitar una unidad", sumarUna: "Agregar una unidad", menos: "Menos", mas: "Más",
     agregado: n => `Agregado al carrito: ${n}`, carritoVaciado: "Carrito vaciado",
     descVendido: p => `Se ha vendido con descuentos de hasta ${p}%.`, unidadesVendidas: n => `${entero(n)} unidades vendidas`, comprarAhora: "Comprar ahora",
+    marca: "Marca", descripcion: "Descripción", caracteristicas: "Características",
     casiListo: "Casi listo", pagoResumen: (n, t) => `Tu pedido tiene <b>${n}</b> ${n === 1 ? "producto" : "productos"} por <b class="num" style="color:var(--precio)">${t}</b>.`,
     pagoSinCuenta: "Para terminar la compra necesitas una cuenta de cliente con autorización de tratamiento de datos (Ley 1581 de 2012). El pago todavía no está disponible en este prototipo. Tu carrito se queda guardado en este navegador.",
     pagoConCuenta: n => `Hola, ${n}. Ya tienes sesión iniciada. Falta conectar el pago y el registro del pedido a tu cuenta; esa parte todavía no está disponible en este prototipo. Tu carrito se queda guardado en este navegador.`,
@@ -533,8 +564,23 @@ const I18N = {
     errCP: p => p === "Colombia" ? "El código postal de Colombia tiene 6 números." : p === "Estados Unidos" ? "El código postal de EE. UU. tiene 5 números (o formato 12345-6789)." : "Revisa el código postal (de 3 a 10 letras o números).",
     envioTitulo: "¿A dónde enviamos tu pedido?", envioRegistrada: "Mi dirección registrada", envioOtra: "Enviar a otra dirección", sinDirReg: "Tu cuenta aún no tiene una dirección guardada. Escríbela aquí.",
     telContacto: "Teléfono de contacto", guardarDir: "Guardar como mi dirección principal", confirmarEnvio: "Confirmar dirección", envioConfirmado: "Dirección de envío confirmada", cambiarEnvio: "Cambiar dirección",
-    dirGuardada: "Dirección guardada en tu cuenta", pagoPendiente: "El pago y el registro del pedido todavía no están disponibles en este prototipo. Tu carrito se queda guardado en este navegador.",
+    dirGuardada: "Dirección guardada en tu cuenta", pagoContinuar: "Continuar al pago", pagoTitulo: "Pago con tarjeta", pagoModoPruebas: "Modo de pruebas: aquí no se cobra dinero real. No escribas tu tarjeta verdadera; usa una tarjeta de prueba.", tarjNum: "Número de tarjeta", tarjNombre: "Nombre en la tarjeta", tarjVence: "Vence (MM/AA)", tarjCvv: "CVV", tarjPrueba: "Ver tarjetas de prueba", tarjAprobada: "Visa aprobada", tarjAprobadaMc: "Mastercard aprobada", tarjRechazada: "Rechazada", tarjSinFondos: "Sin fondos", tarjPruebaNota: "Al tocar una se llenan los datos. Con cualquier otro número, el pago se rechaza.", pagarConfirmar: "Pagar y confirmar pedido", pagando: "Procesando pago…", volver: "Volver", pagoAprobado: (m, u) => `Pago aprobado · ${m} terminada en <b>${u}</b>`, pedConfirmar: "Confirmar pedido", pedErr: "No se pudo confirmar el pedido.", pedSesion: "Tu sesión expiró. Inicia sesión de nuevo.", pedListo: "¡Pedido confirmado!", pedNumero: n => `Tu número de pedido es <b>${n}</b>.`, pagoPendiente: "El pago y el registro del pedido todavía no están disponibles en este prototipo. Tu carrito se queda guardado en este navegador.",
+    envOpciones: "¿Cómo quieres recibirlo?", envNombres: {mismo_dia: "Mismo día", express: "Express", estandar: "Estándar", internacional: "Internacional"},
+    envZonas: {local: "Local (misma ciudad de la bodega)", regional: "Regional (mismo departamento)", costa: "Región Caribe", nacional: "Nacional", especial: "Zona especial (acceso difícil)", internacional: "Internacional"},
+    envDesde: o => `Se envía desde ${o}`, envZona: "Zona", envSale: "Sale de la bodega", envLlega: "Llega entre", envLlegaDia: "Llega",
+    envPrep: n => n === 0 ? "hoy mismo" : `en ${n} ${n === 1 ? "día hábil" : "días hábiles"}`,
+    envTransito: (a, b) => a === b ? (a === 0 ? "entrega el mismo día" : `${a} ${a === 1 ? "día hábil" : "días hábiles"} de transporte`) : `${a} a ${b} días hábiles de transporte`,
+    envGratis: "Gratis", envSub: "Productos", envCosto: "Envío", envTotal: "Total",
+    envNotaFechas: "Las fechas son estimadas y cuentan solo días hábiles (de lunes a viernes, sin festivos de Colombia).",
+    envNotaCorte: h => `El envío del mismo día aplica solo en la ciudad de la bodega, en día hábil y si pides antes de las ${h - 12}:00 p. m.`,
+    envNotaGratis: m => `Envío estándar gratis en Colombia desde ${m} de compra.`, envFalta: m => `Te faltan ${m} para tener envío estándar gratis.`,
+    envNotaTel: "Usaremos tu teléfono solo para coordinar la entrega.", envNotaIntl: "En envíos internacionales el país de destino puede cobrar impuestos o aranceles.",
+    envCargando: "Calculando tu envío…", envError: "No pudimos calcular el envío.", envReintentar: "Reintentar",
     bienvenido: n => `Bienvenido, ${n}`, hola: n => `Hola, ${n}`, cerrarSesion: "Cerrar sesión", sesionCerrada: "Sesión cerrada",
+    editarMisDatos: "Editar mis datos", claveActual: "Contraseña actual", claveActualNota: "Necesaria si cambias tu correo o tu contraseña",
+    claveNueva: "Nueva contraseña (opcional)", claveNuevaPh: "Mínimo 8 caracteres", guardarCambios: "Guardar cambios", cancelar: "Cancelar",
+    perfilActualizado: "Tus datos se actualizaron correctamente.", errClaveActual: "Escribe tu contraseña actual para confirmar el cambio.",
+    cambiarClave: "Cambiar contraseña (opcional)",
     cfg_tema: "Tema", cfg_lang: "Idioma", cfg_moneda: "Moneda", oscuro: "Oscuro", claro: "Claro",
     notaTasa: n => `Los precios en COP son una conversión de referencia: 1 USD = ${n} COP.`, notaNombres: "Los nombres de los productos vienen del dataset original, en inglés.",
     cat: {"Furniture": "Muebles", "Office Supplies": "Oficina", "Technology": "Tecnología"},
@@ -559,6 +605,7 @@ const I18N = {
     quitarUna: "Remove one unit", sumarUna: "Add one unit", menos: "Less", mas: "More",
     agregado: n => `Added to cart: ${n}`, carritoVaciado: "Cart emptied",
     descVendido: p => `This product has sold with discounts of up to ${p}%.`, unidadesVendidas: n => `${entero(n)} units sold`, comprarAhora: "Buy now",
+    marca: "Brand", descripcion: "Description", caracteristicas: "Specifications",
     casiListo: "Almost there", pagoResumen: (n, t) => `Your order has <b>${n}</b> ${n === 1 ? "product" : "products"} for <b class="num" style="color:var(--precio)">${t}</b>.`,
     pagoSinCuenta: "To finish the purchase you need a customer account with consent for data processing (Colombian Law 1581 of 2012). Payment is not available yet in this prototype. Your cart stays saved in this browser.",
     pagoConCuenta: n => `Hi, ${n}. You are signed in. Payment and saving the order to your account still need to be connected; that part is not available yet in this prototype. Your cart stays saved in this browser.`,
@@ -577,8 +624,23 @@ const I18N = {
     errCP: p => p === "Colombia" ? "Colombian postal codes have 6 digits." : p === "Estados Unidos" ? "US ZIP codes have 5 digits (or 12345-6789)." : "Check the postal code (3 to 10 letters or numbers).",
     envioTitulo: "Where should we ship your order?", envioRegistrada: "My registered address", envioOtra: "Ship to another address", sinDirReg: "Your account has no saved address yet. Enter it here.",
     telContacto: "Contact phone", guardarDir: "Save as my main address", confirmarEnvio: "Confirm address", envioConfirmado: "Shipping address confirmed", cambiarEnvio: "Change address",
-    dirGuardada: "Address saved to your account", pagoPendiente: "Payment and saving the order are not available yet in this prototype. Your cart stays saved in this browser.",
+    dirGuardada: "Address saved to your account", pagoContinuar: "Continue to payment", pagoTitulo: "Pay by card", pagoModoPruebas: "Test mode: no real money is charged. Do not enter your real card; use a test card.", tarjNum: "Card number", tarjNombre: "Name on card", tarjVence: "Expires (MM/YY)", tarjCvv: "CVV", tarjPrueba: "Show test cards", tarjAprobada: "Visa approved", tarjAprobadaMc: "Mastercard approved", tarjRechazada: "Declined", tarjSinFondos: "Insufficient funds", tarjPruebaNota: "Tap one to fill in the details. Any other number is declined.", pagarConfirmar: "Pay and place order", pagando: "Processing payment…", volver: "Back", pagoAprobado: (m, u) => `Payment approved · ${m} ending in <b>${u}</b>`, pedConfirmar: "Place order", pedErr: "We couldn't place your order.", pedSesion: "Your session expired. Please sign in again.", pedListo: "Order confirmed!", pedNumero: n => `Your order number is <b>${n}</b>.`, pagoPendiente: "Payment and saving the order are not available yet in this prototype. Your cart stays saved in this browser.",
+    envOpciones: "How do you want to receive it?", envNombres: {mismo_dia: "Same day", express: "Express", estandar: "Standard", internacional: "International"},
+    envZonas: {local: "Local (same city as the warehouse)", regional: "Regional (same department)", costa: "Caribbean region", nacional: "Nationwide", especial: "Special zone (hard to reach)", internacional: "International"},
+    envDesde: o => `Ships from ${o}`, envZona: "Zone", envSale: "Leaves the warehouse", envLlega: "Arrives between", envLlegaDia: "Arrives",
+    envPrep: n => n === 0 ? "today" : `in ${n} business ${n === 1 ? "day" : "days"}`,
+    envTransito: (a, b) => a === b ? (a === 0 ? "same-day delivery" : `${a} business ${a === 1 ? "day" : "days"} in transit`) : `${a} to ${b} business days in transit`,
+    envGratis: "Free", envSub: "Products", envCosto: "Shipping", envTotal: "Total",
+    envNotaFechas: "Dates are estimates and count business days only (Monday to Friday, excluding Colombian holidays).",
+    envNotaCorte: h => `Same-day shipping applies only in the warehouse city, on business days, if you order before ${h - 12}:00 p.m.`,
+    envNotaGratis: m => `Free standard shipping in Colombia on purchases of ${m} or more.`, envFalta: m => `You are ${m} away from free standard shipping.`,
+    envNotaTel: "We will use your phone only to coordinate the delivery.", envNotaIntl: "For international shipments, the destination country may charge taxes or duties.",
+    envCargando: "Calculating your shipping…", envError: "We could not calculate the shipping.", envReintentar: "Try again",
     bienvenido: n => `Welcome, ${n}`, hola: n => `Hi, ${n}`, cerrarSesion: "Sign out", sesionCerrada: "Signed out",
+    editarMisDatos: "Edit my details", claveActual: "Current password", claveActualNota: "Required if changing your email or password",
+    claveNueva: "New password (optional)", claveNuevaPh: "At least 8 characters", guardarCambios: "Save changes", cancelar: "Cancel",
+    perfilActualizado: "Your details were updated successfully.", errClaveActual: "Enter your current password to confirm the change.",
+    cambiarClave: "Change password (optional)",
     cfg_tema: "Theme", cfg_lang: "Language", cfg_moneda: "Currency", oscuro: "Dark", claro: "Light",
     notaTasa: n => `COP prices are a reference conversion: 1 USD = ${n} COP.`, notaNombres: "Product names come from the original dataset, in English.",
     cat: {}, sub: {}
@@ -785,14 +847,30 @@ function aviso(txt) { const el = $("#toast"); el.textContent = txt; el.classList
 function verDetalle(k) {
   const p = CATALOGO.get(k); if (!p) return;
   const dto = p.descuento_max > 0 ? `<p class="muted">${t("descVendido", Math.round(p.descuento_max * 100))}</p>` : "";
+  const marcaHtml = p.marca ? `<span class="det-marca">${esc(p.marca)}</span>` : "";
+  const descHtml = p.descripcion ? `<p class="det-desc">${esc(p.descripcion)}</p>` : "";
+  const fichaHtml = (p.ficha && Array.isArray(p.ficha) && p.ficha.length) ? `
+    <div class="det-ficha">
+      <h3>${t("caracteristicas")}</h3>
+      <table class="tabla-ficha">
+        <tbody>
+          ${p.ficha.map(f => `<tr><th>${esc(f.atributo || f.nombre)}</th><td>${esc(f.valor)}</td></tr>`).join("")}
+        </tbody>
+      </table>
+    </div>` : "";
   $("#detalleCuerpo").innerHTML = `<button class="cerrar" data-accion="cerrar-dialogo" aria-label="${t("cerrar")}">&times;</button>
-    <div class="det">${tile(p)}<div><h2>${esc(p.nombre)}</h2>
+    <div class="det">${tile(p)}<div>
+      ${marcaHtml}
+      <h2>${esc(p.nombre)}</h2>
       <p class="muted">${esc(subL(p.subcategoria))} · ${esc(catL(p.categoria))}</p>
       <p class="precio">${din(p.precio)}</p>${dto}<p class="muted">${t("unidadesVendidas", p.vendidos)} · <span class="id">${esc(p.product_id)}</span></p>
+      ${descHtml}
       ${avisoStock(p)}
       <div class="acc"><span class="paso"><button data-accion="det-menos" aria-label="${t("menos")}">−</button><span id="detCant">1</span><button data-accion="det-mas" aria-label="${t("mas")}">+</button></span>
         <button class="btn-blanco" data-accion="det-agregar" data-k="${esc(k)}">${t("agregarCarrito")}</button>
-        <button class="btn-naranja" data-accion="det-comprar" data-k="${esc(k)}">${t("comprarAhora")}</button></div></div></div>`;
+        <button class="btn-naranja" data-accion="det-comprar" data-k="${esc(k)}">${t("comprarAhora")}</button></div>
+      ${fichaHtml}
+    </div></div>`;
   $("#detalle").showModal();
 }
 
@@ -828,11 +906,59 @@ function pintarEnvio() {
     <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:6px"><button class="btn-naranja" data-accion="envio-confirmar">${t("confirmarEnvio")}</button>
       <button class="btn-blanco" data-accion="cerrar-dialogo">${t("seguirComprando")}</button><button class="btn-fantasma" data-accion="vaciar">${t("vaciar")}</button></div>`);
 }
+let COTIZ = null, OPCION = null;     // cotización de envío del servidor y la opción elegida
+const copAMoneda = cop => CFG.moneda === "COP" ? cop : Math.round(cop / TASA * 100) / 100;
+const subtotalCop = () => Math.round(Object.values(carrito).reduce((a, i) => a + i.cant * i.p.precio, 0) * TASA);
+const fechaEnv = iso => new Date(iso + "T12:00:00").toLocaleDateString(loc(), {weekday: "short", day: "numeric", month: "short"});
+const opEnvio = () => COTIZ.opciones.find(o => o.id === OPCION);
+
 function pintarEnvioListo() {
   $("#pagoCuerpo").innerHTML = cabPago(`<div class="resumen-dir"><b>${t("envioConfirmado")}</b><p>${esc(textoDir(ENVIO))}</p><p class="muted">${t("telefono")}: ${esc(ENVIO.telefono)}</p></div>
-    <p class="muted" style="margin:0 0 18px;font-size:.95rem">${t("pagoPendiente")}</p>
-    <div style="display:flex;gap:10px;flex-wrap:wrap"><button class="btn-fantasma" data-accion="cambiar-envio">${t("cambiarEnvio")}</button>
+    <div id="envCotiz"><p class="muted" role="status">${t("envCargando")}</p></div>
+    <div class="err" id="pErr" role="alert" hidden></div>
+    <div style="display:flex;gap:10px;flex-wrap:wrap"><button class="btn-naranja" id="btnPedido" data-accion="pago-ir">${t("pagoContinuar")}</button><button class="btn-fantasma" data-accion="cambiar-envio">${t("cambiarEnvio")}</button>
       <button class="btn-blanco" data-accion="cerrar-dialogo">${t("seguirComprando")}</button></div>`);
+  cargarCotizacion();
+}
+async function cargarCotizacion() {
+  const q = new URLSearchParams({pais: ENVIO.pais, region: ENVIO.region || "", ciudad: ENVIO.ciudad || "", subtotal_cop: subtotalCop()});
+  let datos = null;
+  try { const r = await fetch("/tienda/envio?" + q); if (r.ok) datos = await r.json(); } catch (e) {}
+  const caja = $("#envCotiz"); if (!caja) return;               // el diálogo ya se cerró
+  if (!datos || !datos.opciones.length) {
+    caja.innerHTML = `<p class="err" role="alert">${t("envError")}</p><button class="btn-fantasma" data-accion="reintentar-envio" style="margin-bottom:14px">${t("envReintentar")}</button>`;
+    return;
+  }
+  COTIZ = datos;
+  if (!datos.opciones.some(o => o.id === OPCION)) OPCION = datos.opciones.reduce((a, o) => o.costo_cop < a.costo_cop ? o : a).id;   // por defecto, la más barata
+  pintarCotizacion();
+}
+function opcionHTML(o) {
+  const llega = o.entrega_desde === o.entrega_hasta ? `${t("envLlegaDia")}: <b>${fechaEnv(o.entrega_hasta)}</b>` : `${t("envLlega")}: <b>${fechaEnv(o.entrega_desde)} – ${fechaEnv(o.entrega_hasta)}</b>`;
+  return `<label class="op-envio"><input type="radio" name="envioOp" value="${esc(o.id)}" ${o.id === OPCION ? "checked" : ""}>
+    <span class="op-info"><b>${t("envNombres")[o.id] || esc(o.id)}</b>
+      <small>${t("envSale")}: <b>${fechaEnv(o.despacho)}</b> · ${t("envPrep", o.alistamiento_dias)}</small>
+      <small>${llega} · ${t("envTransito", o.transito_min, o.transito_max)}</small></span>
+    <b class="costo">${o.gratis ? t("envGratis") : fmtMoneda(copAMoneda(o.costo_cop))}</b></label>`;
+}
+function totalesEnvio() {
+  const o = opEnvio(), env = copAMoneda(o.costo_cop), sub = sumaMoneda(), total = Math.round((sub + env) * 100) / 100;
+  return `<div><span>${t("envSub")}</span><b>${fmtMoneda(sub)}</b></div>
+    <div><span>${t("envCosto")}</span><b>${o.gratis ? t("envGratis") : fmtMoneda(env)}</b></div>
+    <div class="gran"><span>${t("envTotal")}</span><b>${fmtMoneda(total)}</b></div>`;
+}
+function pintarCotizacion() {
+  const c = COTIZ, falta = c.envio_gratis_desde_cop ? c.envio_gratis_desde_cop - subtotalCop() : 0;
+  const notas = [t("envNotaFechas")];
+  if (c.zona === "local") notas.push(t("envNotaCorte", c.hora_de_corte));
+  if (c.zona === "internacional") notas.push(t("envNotaIntl"));
+  else if (c.envio_gratis_desde_cop) notas.push(falta > 0 ? t("envFalta", fmtMoneda(copAMoneda(falta))) : t("envNotaGratis", fmtMoneda(copAMoneda(c.envio_gratis_desde_cop))));
+  notas.push(t("envNotaTel"));
+  $("#envCotiz").innerHTML = `<span class="zona-env">${t("envDesde", esc(c.origen))} · ${t("envZona")}: ${t("envZonas")[c.zona] || esc(c.zona)}</span>
+    <p class="sec-tit" id="envOpTit" style="margin-top:14px">${t("envOpciones")}</p>
+    <div role="radiogroup" aria-labelledby="envOpTit">${c.opciones.map(opcionHTML).join("")}</div>
+    <div class="tot-env" id="envTotales" aria-live="polite">${totalesEnvio()}</div>
+    <ul class="notas-env">${notas.map(n => `<li>${n}</li>`).join("")}</ul>`;
 }
 async function confirmarEnvio() {
   const modo = $("input[name=envioModo]:checked")?.value, err = $("#eErr");
@@ -850,6 +976,65 @@ async function confirmarEnvio() {
   ENVIO = {...dir, telefono: tel};
   pintarEnvioListo();
 }
+
+const TARJETAS_PRUEBA = [["4242 4242 4242 4242", "tarjAprobada"], ["5555 5555 5555 4444", "tarjAprobadaMc"], ["4000 0000 0000 0002", "tarjRechazada"], ["4000 0000 0000 9995", "tarjSinFondos"]];
+
+function pintarPago() {
+  if (!COTIZ || !OPCION) return pintarEnvioListo();
+  const total = Math.round((sumaMoneda() + copAMoneda(opEnvio().costo_cop)) * 100) / 100;
+  $("#pagoCuerpo").innerHTML = cabPago(`<p class="sec-tit" style="margin-top:14px">${t("pagoTitulo")}</p>
+    <p class="muted" style="margin-bottom:12px;font-size:.92rem">${t("pagoModoPruebas")}</p>
+    <div class="campo"><label for="pTarj">${t("tarjNum")}</label><input id="pTarj" inputmode="numeric" autocomplete="cc-number" maxlength="23" placeholder="4242 4242 4242 4242"></div>
+    <div class="campo"><label for="pNombre">${t("tarjNombre")}</label><input id="pNombre" autocomplete="cc-name" maxlength="60"></div>
+    <div class="fila2">
+      <div class="campo"><label for="pVence">${t("tarjVence")}</label><input id="pVence" inputmode="numeric" autocomplete="cc-exp" maxlength="5" placeholder="MM/AA"></div>
+      <div class="campo"><label for="pCvv">${t("tarjCvv")}</label><input id="pCvv" inputmode="numeric" autocomplete="cc-csc" maxlength="4" placeholder="123"></div>
+    </div>
+    <details style="margin:0 0 14px"><summary class="muted" style="cursor:pointer">${t("tarjPrueba")}</summary>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px">${TARJETAS_PRUEBA.map(([n, k]) =>
+        `<button type="button" class="btn-fantasma" data-accion="tarjeta-prueba" data-num="${n}">${t(k)}</button>`).join("")}</div>
+      <p class="muted" style="margin-top:8px;font-size:.86rem">${t("tarjPruebaNota")}</p></details>
+    <div class="tot-env"><div class="gran"><span>${t("envTotal")}</span><b>${fmtMoneda(total)}</b></div></div>
+    <div class="err" id="pErr" role="alert" hidden></div>
+    <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:6px"><button class="btn-naranja" id="btnPagarTarj" data-accion="pagar-confirmar">${t("pagarConfirmar")}</button>
+      <button class="btn-fantasma" data-accion="pago-volver">${t("volver")}</button></div>`);
+}
+
+async function pagarYConfirmar() {
+  const err = $("#pErr"), btn = $("#btnPagarTarj"); err.hidden = true;
+  const fallo = r => {
+    err.hidden = false;
+    err.textContent = [r.datos?.error || t("pedErr"), ...(r.datos?.detalles || [])].join(" · ");
+    btn.disabled = false; btn.textContent = t("pagarConfirmar");
+  };
+  btn.disabled = true; btn.textContent = t("pagando");
+  const base = {
+    opcion_envio: OPCION,
+    destino: {pais: ENVIO.pais, region: ENVIO.region || "", ciudad: ENVIO.ciudad || ""},
+    items: Object.values(carrito).map(i => ({product_id: i.p.product_id, product_name: i.p.nombre, quantity: i.cant}))};
+  // Paso 1: cobro en la pasarela (simulada). El número de la tarjeta solo viaja aquí y el servidor no lo guarda.
+  const pago = await post("/cuenta/pago", {...base, tarjeta: {numero: $("#pTarj").value, nombre: $("#pNombre").value.trim(),
+    vence: $("#pVence").value.trim(), cvv: $("#pCvv").value.trim()}});
+  if (!pago.ok) return fallo(pago);
+  // Paso 2: con el pago aprobado se guarda el pedido.
+  const r = await post("/cuenta/pedido", {...base, pago_id: pago.datos.pago_id});
+  if (!r.ok) return fallo(r);
+  const d = r.datos;
+  carrito = {}; guardarCarrito(); pintarCarrito();
+  const llega = d.entrega_desde === d.entrega_hasta ? fechaEnv(d.entrega_hasta) : `${fechaEnv(d.entrega_desde)} – ${fechaEnv(d.entrega_hasta)}`;
+  $("#pagoCuerpo").innerHTML = `<button class="cerrar" data-accion="cerrar-dialogo" aria-label="${t("cerrar")}">&times;</button>
+    <h2>${t("pedListo")}</h2><p>${t("pedNumero", esc(d.order_id))}</p>
+    <div class="resumen-dir"><p>${t("pagoAprobado", esc(d.marca), esc(d.ultimos4))}</p>
+      <p>${t("envLlega")}: <b>${llega}</b></p><p>${t("envTotal")}: <b>${fmtMoneda(copAMoneda(d.total_cop))}</b></p></div>
+    <button class="btn-blanco" data-accion="cerrar-dialogo">${t("seguirComprando")}</button>`;
+}
+
+// Da formato mientras se escribe: la tarjeta en grupos de 4 y la fecha como MM/AA.
+document.addEventListener("input", e => {
+  if (e.target.id === "pTarj") e.target.value = e.target.value.replace(/\D/g, "").slice(0, 19).replace(/(.{4})/g, "$1 ").trim();
+  if (e.target.id === "pVence") { const v = e.target.value.replace(/\D/g, "").slice(0, 4); e.target.value = v.length > 2 ? v.slice(0, 2) + "/" + v.slice(2) : v; }
+  if (e.target.id === "pCvv") e.target.value = e.target.value.replace(/\D/g, "").slice(0, 4);
+});
 
 /* ================= cuenta de cliente ================= */
 let CUENTA = null;
@@ -907,6 +1092,7 @@ function validarDireccion(d) {          // devuelve el texto del problema, o nul
 }
 document.addEventListener("change", e => {
   if (e.target.name === "envioModo") { $("#envioForm").hidden = e.target.value !== "otra"; return; }
+  if (e.target.name === "envioOp") { OPCION = e.target.value; $("#envTotales").innerHTML = totalesEnvio(); return; }
   const el = e.target.closest("[data-ubic]"); if (!el) return;
   const p = el.dataset.p, tipo = el.dataset.ubic;
   if (tipo === "pais") { $(`#${p}RegionBox`).innerHTML = regionHTML(p, el.value, ""); $(`#${p}CiudadBox`).innerHTML = ciudadHTML(p, el.value, "", ""); }
@@ -930,12 +1116,37 @@ function pintarCuentaBtn() {
 }
 function abrirAuth(modo = "entrar") {
   if (CUENTA) {
-    const d = CUENTA.direccion;
-    $("#authCuerpo").innerHTML = `<button class="cerrar" data-accion="cerrar-dialogo" aria-label="${t("cerrar")}">&times;</button>
-      <h2>${esc(t("hola", CUENTA.nombre.split(" ")[0]))}</h2><p class="muted">${esc(CUENTA.email)}</p>
-      ${CUENTA.telefono ? `<p class="muted">${t("telefono")}: ${esc(CUENTA.telefono)}</p>` : ""}
-      ${d ? `<div class="resumen-dir"><b>${t("miDir")}</b><p>${esc(textoDir(d))}</p></div>` : ""}
-      <button class="btn-fantasma" style="margin-top:18px" data-accion="salir-cuenta">${t("cerrarSesion")}</button>`;
+    if (modo === "editar") {
+      const d = CUENTA.direccion || {};
+      $("#authCuerpo").innerHTML = `<button class="cerrar" data-accion="cerrar-dialogo" aria-label="${t("cerrar")}">&times;</button>
+        <h2>${t("editarMisDatos")}</h2>
+        <form id="formPerfil" novalidate>
+          <div class="fila2"><div class="campo"><label for="uNombre">${t("nombre")}</label><input id="uNombre" type="text" autocomplete="given-name" maxlength="60" value="${esc(CUENTA.nombre || "")}"></div>
+            <div class="campo"><label for="uApellido">${t("apellido")}</label><input id="uApellido" type="text" autocomplete="family-name" maxlength="60" value="${esc(CUENTA.apellido || "")}"></div></div>
+          <div class="campo"><label for="uCorreo">${t("correo")}</label><input id="uCorreo" type="email" autocomplete="email" maxlength="254" value="${esc(CUENTA.email || "")}"></div>
+          <div class="campo"><label for="uTel">${t("telefono")}</label><input id="uTel" type="tel" autocomplete="tel" maxlength="25" placeholder="+57 300 123 4567" value="${esc(CUENTA.telefono || "")}"></div>
+          <p class="sec-tit">${t("seccionDir")}</p>
+          ${formDireccion("u", d)}
+          <p class="sec-tit" style="margin-top:14px">${t("cambiarClave")}</p>
+          <div class="campo"><label for="uClaveActual">${t("claveActual")}</label><input id="uClaveActual" type="password" autocomplete="current-password" maxlength="128"><small>${t("claveActualNota")}</small></div>
+          <div class="campo"><label for="uClaveNueva">${t("claveNueva")}</label><input id="uClaveNueva" type="password" autocomplete="new-password" maxlength="128" placeholder="${esc(t("claveNuevaPh"))}"><small>${t("claveAyuda")}</small></div>
+          <div class="err" id="uErr" role="alert" hidden></div>
+          <div style="display:flex;gap:10px;margin-top:16px">
+            <button class="btn-naranja" type="submit" style="flex:1">${t("guardarCambios")}</button>
+            <button class="btn-blanco" type="button" data-accion="ver-perfil">${t("cancelar")}</button>
+          </div>
+        </form>`;
+    } else {
+      const d = CUENTA.direccion;
+      $("#authCuerpo").innerHTML = `<button class="cerrar" data-accion="cerrar-dialogo" aria-label="${t("cerrar")}">&times;</button>
+        <h2>${esc(t("hola", CUENTA.nombre.split(" ")[0]))}</h2><p class="muted">${esc(CUENTA.email)}</p>
+        ${CUENTA.telefono ? `<p class="muted">${t("telefono")}: ${esc(CUENTA.telefono)}</p>` : ""}
+        ${d ? `<div class="resumen-dir"><b>${t("miDir")}</b><p>${esc(textoDir(d))}</p></div>` : ""}
+        <div style="display:flex;gap:10px;flex-direction:column;margin-top:18px">
+          <button class="btn-naranja" data-accion="editar-perfil">${t("editarMisDatos")}</button>
+          <button class="btn-fantasma" data-accion="salir-cuenta">${t("cerrarSesion")}</button>
+        </div>`;
+    }
   } else {
     const reg = modo === "crear";
     $("#authCuerpo").innerHTML = `<button class="cerrar" data-accion="cerrar-dialogo" aria-label="${t("cerrar")}">&times;</button>
@@ -957,32 +1168,82 @@ function abrirAuth(modo = "entrar") {
   if (!$("#auth").open) $("#auth").showModal();
 }
 document.addEventListener("submit", async e => {
-  if (e.target.id !== "formAuth") return;
-  e.preventDefault();
-  const reg = e.target.dataset.form === "crear", err = $("#aErr"), g = id => ($("#" + id)?.value || "").trim();
-  const email = g("aCorreo"), clave = $("#aClave").value;
-  const fallo = txt => { err.hidden = false; err.textContent = txt; };
-  const correoOk = /^[^@\s]+@[^@\s]+\.[^@\s]{2,}$/.test(email);
-  let cuerpo;
-  if (reg) {
-    const nombre = g("aNombre"), apellido = g("aApellido"), telefono = g("aTel"), dir = leerDireccion("r");
+  if (e.target.id === "formAuth") {
+    e.preventDefault();
+    const reg = e.target.dataset.form === "crear", err = $("#aErr"), g = id => ($("#" + id)?.value || "").trim();
+    const email = g("aCorreo"), clave = $("#aClave").value;
+    const fallo = txt => { err.hidden = false; err.textContent = txt; };
+    const correoOk = /^[^@\s]+@[^@\s]+\.[^@\s]{2,}$/.test(email);
+    let cuerpo;
+    if (reg) {
+      const nombre = g("aNombre"), apellido = g("aApellido"), telefono = g("aTel"), dir = leerDireccion("r");
+      if (nombre.length < 2) return fallo(t("errNombre"));
+      if (apellido.length < 2) return fallo(t("errApellido"));
+      if (!correoOk) return fallo(t("errCorreo"));
+      if (!telValido(telefono)) return fallo(t("errTel"));
+      if (clave.length < 8) return fallo(t("errClave"));
+      const problema = validarDireccion(dir); if (problema) return fallo(problema);
+      if (!$("#aAutoriza").checked) return fallo(t("errAutoriza"));
+      cuerpo = {nombre, apellido, email, password: clave, telefono, ...dir, autorizacion_datos: true};
+    } else {
+      if (!correoOk) return fallo(t("errCorreo"));
+      if (!clave) return fallo(t("errLogin"));
+      cuerpo = {email, password: clave};
+    }
+    const r = await post(reg ? "/cuenta/registro" : "/cuenta/entrar", cuerpo);
+    if (r.ok) { CUENTA = r.datos; pintarCuentaBtn(); $("#auth").close(); aviso(t("bienvenido", CUENTA.nombre.split(" ")[0])); return; }
+    fallo(r.status === 422 && r.datos?.detalles ? t("errDatos") + " " + r.datos.detalles.join(" · ")
+      : ({401: t("errLogin"), 409: t("errDup"), 429: t("errMuchos"), 0: t("errRed")})[r.status] || t("errDatos"));
+    return;
+  }
+  if (e.target.id === "formPerfil") {
+    e.preventDefault();
+    const err = $("#uErr"), g = id => ($("#" + id)?.value || "").trim();
+    const fallo = txt => { err.hidden = false; err.textContent = txt; };
+    const nombre = g("uNombre"), apellido = g("uApellido"), email = g("uCorreo"), telefono = g("uTel");
+    const claveActual = $("#uClaveActual").value, claveNueva = $("#uClaveNueva").value;
+    const correoOk = /^[^@\s]+@[^@\s]+\.[^@\s]{2,}$/.test(email);
+
     if (nombre.length < 2) return fallo(t("errNombre"));
     if (apellido.length < 2) return fallo(t("errApellido"));
     if (!correoOk) return fallo(t("errCorreo"));
     if (!telValido(telefono)) return fallo(t("errTel"));
-    if (clave.length < 8) return fallo(t("errClave"));
-    const problema = validarDireccion(dir); if (problema) return fallo(problema);
-    if (!$("#aAutoriza").checked) return fallo(t("errAutoriza"));
-    cuerpo = {nombre, apellido, email, password: clave, telefono, ...dir, autorizacion_datos: true};
-  } else {
-    if (!correoOk) return fallo(t("errCorreo"));
-    if (!clave) return fallo(t("errLogin"));
-    cuerpo = {email, password: clave};
+    const dir = leerDireccion("u");
+    const problema = validarDireccion(dir);
+    if (problema) return fallo(problema);
+
+    const emailCambio = email.toLowerCase() !== (CUENTA?.email || "").toLowerCase();
+    const cambiaClave = claveNueva.length > 0;
+
+    if ((emailCambio || cambiaClave) && !claveActual) {
+      return fallo(t("errClaveActual"));
+    }
+    if (cambiaClave && claveNueva.length < 8) {
+      return fallo(t("errClave"));
+    }
+
+    const cuerpo = {
+      nombre,
+      apellido,
+      email,
+      telefono,
+      ...dir
+    };
+    if (claveActual) cuerpo.password_actual = claveActual;
+    if (claveNueva) cuerpo.password_nueva = claveNueva;
+
+    const r = await enviar("PUT", "/cuenta/perfil", cuerpo);
+    if (r.ok) {
+      CUENTA = r.datos;
+      pintarCuentaBtn();
+      $("#auth").close();
+      aviso(t("perfilActualizado"));
+      return;
+    }
+    const txtError = r.status === 422 && r.datos?.detalles ? t("errDatos") + " " + r.datos.detalles.join(" · ")
+      : ({401: r.datos?.error || t("errLogin"), 409: t("errDup"), 429: t("errMuchos"), 0: t("errRed")})[r.status] || (r.datos?.error || t("errDatos"));
+    fallo(txtError);
   }
-  const r = await post(reg ? "/cuenta/registro" : "/cuenta/entrar", cuerpo);
-  if (r.ok) { CUENTA = r.datos; pintarCuentaBtn(); $("#auth").close(); aviso(t("bienvenido", CUENTA.nombre.split(" ")[0])); return; }
-  fallo(r.status === 422 && r.datos?.detalles ? t("errDatos") + " " + r.datos.detalles.join(" · ")
-    : ({401: t("errLogin"), 409: t("errDup"), 429: t("errMuchos"), 0: t("errRed")})[r.status] || t("errDatos"));
 });
 
 /* ================= configuración ================= */
@@ -1037,9 +1298,16 @@ document.addEventListener("click", e => {
     case "reintentar": reiniciar(); break;
     case "config": abrirConfig(); break;
     case "cuenta": abrirAuth("entrar"); break;
+    case "editar-perfil": abrirAuth("editar"); break;
+    case "ver-perfil": abrirAuth("perfil"); break;
     case "abrir-auth": $("#pago").close(); abrirAuth("crear"); break;
     case "envio-confirmar": confirmarEnvio(); break;
+    case "pago-ir": pintarPago(); break;
+    case "pago-volver": pintarEnvioListo(); break;
+    case "pagar-confirmar": pagarYConfirmar(); break;
+    case "tarjeta-prueba": $("#pTarj").value = b.dataset.num; $("#pNombre").value = "Cliente Prueba"; $("#pVence").value = "12/30"; $("#pCvv").value = "123"; break;
     case "cambiar-envio": pintarEnvio(); break;
+    case "reintentar-envio": cargarCotizacion(); break;
     case "salir-cuenta": post("/cuenta/salir").then(() => { CUENTA = null; ENVIO = null; pintarCuentaBtn(); $("#auth").close(); aviso(t("sesionCerrada")); }); break;
   }
   if (ir) irA(ir.dataset.ir);

@@ -141,3 +141,57 @@ Si algo falla (cliente o producto inexistente, cantidad negativa...), **no se gu
 - La sección de administradores permite **crear**, pero todavía no editar ni borrar categorías o productos.
 - El código para volverse administrador es `ADMIN_KEY`: quien lo conozca puede crear cuentas de administrador. En producción conviene definirla larga y secreta (y cambiarla si se filtra).
 - Las animaciones de apertura y cierre de ventanas usan funciones recientes del navegador (Chrome/Edge 117+, Safari 17.4+, Firefox 129+); en uno más viejo todo funciona, solo que sin ese fundido.
+
+
+## Base de datos vacía por defecto
+
+Si no existe `mercado_express.db`, la app crea una base **vacía** (solo las tablas y los dos servicios de turnos).
+Para cargar el dataset de Superstore: `$env:CARGAR_DATASET = "1"` antes de `python app.py` (con la base borrada).
+
+## Turnos y capacidad (actividad 9)
+
+Pantalla: `/turnos`. Cada turno guarda **llegada**, **inicio de atención** y **fin**; de esas horas salen las duraciones
+y la tasa de llegadas. Para cada servicio se calcula (módulo `colas.py`, modelo de colas **M/M/c**, fórmula de Erlang C):
+
+| Dato | Cómo sale |
+|---|---|
+| Llegadas por hora (λ) | turnos que llegaron en la última hora |
+| Duración promedio | últimos 20 turnos terminados (3 min por defecto si aún no hay) |
+| Ocupación (ρ) | λ / (asesores × atenciones por hora de un asesor) |
+| Espera esperada | Erlang C: P(esperar) / (c·μ − λ); "sin límite" si ρ ≥ 1 |
+| Asesores recomendados | menor c con el que la espera esperada ≤ la meta |
+| Espera ahora | personas en fila × duración promedio / asesores |
+
+Rutas: `GET /turnos/api/estado` y `POST /turnos/api/pedir` (públicas, con límite por dispositivo y tope de fila),
+`POST /admin/turnos/api/llamar` y `PUT /admin/turnos/api/servicio/<id>` (asesores y meta de espera; solo administradores).
+
+
+## Envío: costo, despacho y llegada estimada
+
+Al confirmar la dirección, la tienda llama a `GET /tienda/envio?pais=&region=&ciudad=&subtotal_cop=` (pública, sin datos
+personales) y muestra las opciones con su **costo**, cuándo **sale de la bodega** y entre qué fechas **llega**.
+El cálculo está en `envio.py` (funciones puras, con pruebas):
+
+- Bodega en Montería, Córdoba. Zonas: local, regional, costa, nacional, especial (acceso difícil) e internacional.
+- Opciones: mismo día (solo en Montería, en día hábil y antes de las 2:00 p. m.), express, estándar e internacional.
+- Todo cuenta **días hábiles** (lunes a viernes, sin festivos de Colombia, incluidos los de Semana Santa y los trasladados al lunes).
+- Alistamiento de 1 día hábil; el tránsito depende de la zona. Envío estándar gratis en Colombia desde $200.000 COP.
+- Son fechas **estimadas**: el pago y el registro del pedido todavía no existen en el prototipo.
+
+## Mi actividad: ver, cancelar y modificar pedidos
+
+La página `/turnos` ("Mi actividad") tiene dos pestañas: **Mis pedidos** y **Turnos**. Usa el mismo diseño, tema (claro/oscuro) e idioma de la tienda.
+
+- Al tocar un pedido se abre su detalle: descripción, estado, fechas, envío, pago, total y productos (con su ID debajo).
+- Durante `PEDIDO_EDITABLE_MIN` minutos (por defecto **30**, se cambia con esa variable de entorno) el cliente puede:
+  - **Cancelar**: se devuelve el stock, el pago queda `reembolsado` y el pedido deja de contar en los reportes.
+  - **Modificar**: bajar cantidades o quitar productos. La diferencia se reembolsa; el envío no cambia. No se puede aumentar (hay que hacer otro pedido) ni quitar todo (se cancela).
+- Pasado ese tiempo, o si el pedido ya salió a despacho, solo se puede ver. El reloj lo lleva el servidor.
+
+| Ruta | Qué hace |
+|------|----------|
+| `GET /cuenta/pedidos` | Pedidos de la cuenta, con `editable`, `segundos_restantes`, productos y total |
+| `POST /cuenta/pedidos/<id>/cancelar` | Cancela (dentro de la ventana) |
+| `PUT /cuenta/pedidos/<id>` | Cambia cantidades: `{"items":[{"product_id","product_name","quantity"}]}` (`quantity` 0 = quitar) |
+
+La tabla `pedidos` tiene tres columnas nuevas (`creado`, `envio_cop`, `cancelado_en`); las bases viejas se actualizan solas al arrancar.
