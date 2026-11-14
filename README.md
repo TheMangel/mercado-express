@@ -8,7 +8,8 @@ Pone en práctica lo investigado en el M2-A3: validación + transacciones, consu
 ```bash
 pip install -r requirements.txt
 
-# Define tus claves (si no lo haces, la app genera unas al azar y las imprime al arrancar)
+# Define tus claves (si no lo haces, la app genera unas al azar y las imprime al arrancar;
+# en producción se recomienda siempre definirlas para que no cambien en cada reinicio)
 export API_KEY=mi-clave-de-usuario
 export ADMIN_KEY=mi-clave-de-admin
 
@@ -128,7 +129,7 @@ Si algo falla (cliente o producto inexistente, cantidad negativa...), **no se gu
 
 - Build command: `pip install -r requirements.txt`
 - Start command: `gunicorn "app:create_app()"`
-- Variables de entorno: `API_KEY` y `ADMIN_KEY` (obligatorio definirlas, nunca las subas a GitHub).
+- Variables de entorno: `API_KEY` y `ADMIN_KEY` (si no las defines, la app genera unas al azar y las imprime al arrancar; en producción defínelas siempre y no las subas a GitHub).
 - Ojo: en el plan gratuito el disco es temporal. La base se reconstruye desde el CSV en cada despliegue o reinicio, así que los pedidos nuevos no se conservan. Para que persistan haría falta un disco persistente o una base externa.
 
 ## Límites conocidos (versión 1)

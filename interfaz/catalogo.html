@@ -1236,6 +1236,8 @@
             <div class="campo"><label for="pPrecio">Precio en dólares (USD)</label><input id="pPrecio" type="number"
                 inputmode="decimal" min="0.01" step="0.01" placeholder="0.00"><small>La tienda también lo muestra en
                 pesos (COP) con la tasa del servidor.</small></div>
+            <div class="campo"><label for="pDescuento">Descuento (%)</label><input id="pDescuento" type="number"
+                inputmode="decimal" min="0" max="100" step="1" value="0" placeholder="0"><small>Porcentaje de descuento para este producto (0 a 100%).</small></div>
             <div class="campo"><label for="pStock">Cantidad en stock (unidades)</label><input id="pStock" type="number"
                 inputmode="numeric" min="0" step="1" placeholder="0"><small>Cuántas unidades tienes disponibles ahora.
                 Después podrás agregar o quitar desde «Editar».</small></div>
@@ -1257,9 +1259,26 @@
 
       <section class="card" id="gestionProductos" aria-labelledby="gpTit">
         <h2 id="gpTit">Administrar productos</h2>
-        <p class="muted">Edita el nombre, la categoría, el precio o el stock de cualquier producto. «Ocultar» lo quita
+        <p class="muted">Edita el nombre, la categoría, el precio, descuento o el stock de cualquier producto. «Ocultar» lo quita
           de la tienda sin borrarlo; «Eliminar» lo borra, salvo que ya tenga ventas (entonces solo se oculta, para no
           dañar el historial).</p>
+
+        <!-- Descuento general del catálogo -->
+        <div class="caja-descuento-general" style="background:var(--fondo-suave, #f8f9fa);border:1px solid var(--borde, #e9ecef);border-radius:12px;padding:14px 18px;margin:16px 0;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px">
+          <div>
+            <b style="font-size:.95rem;display:flex;align-items:center;gap:6px">🏷️ Descuento general del catálogo</b>
+            <p class="muted" style="margin:2px 0 0;font-size:.84rem">Aplica un porcentaje de descuento global que se muestra en tiempo real en la tienda.</p>
+          </div>
+          <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+            <div style="display:flex;align-items:center;gap:4px">
+              <input type="number" id="descGenPorc" min="0" max="100" step="1" value="0" style="width:70px;text-align:center;padding:6px 8px;border-radius:8px;border:1px solid var(--borde)" placeholder="0">
+              <span style="font-weight:600">%</span>
+            </div>
+            <button type="button" class="btn-naranja btn-mini" id="btnFijarDescGen">Fijar descuento global</button>
+            <button type="button" class="btn-fantasma btn-mini" id="btnAplicarTodosDesc">Aplicar a todos</button>
+            <button type="button" class="btn-fantasma btn-mini peligro" id="btnQuitarDescGen">Quitar descuentos</button>
+          </div>
+        </div>
         <div class="gp-filtros">
           <div class="campo"><label for="gpBusca">Buscar por nombre</label><input id="gpBusca" type="search"
               maxlength="80" autocomplete="off" placeholder="Ej.: silla"></div>
@@ -1308,6 +1327,10 @@
           inputmode="decimal" min="0.01" step="0.01">
         <small id="edNotaPrecio" hidden>Este producto usa el precio calculado del historial de ventas. Si lo cambias,
           desde ahora se usa el que escribas.</small>
+      </div>
+      <div class="campo"><label for="edDescuento">Descuento (%)</label><input id="edDescuento" type="number"
+          inputmode="decimal" min="0" max="100" step="1" value="0">
+        <small id="edNotaDescuento" style="color:var(--naranja);font-weight:600;display:block;margin-top:4px"></small>
       </div>
       <div class="campo"><label for="edDesc">Descripción</label><textarea id="edDesc" rows="3" maxlength="2000"
           placeholder="Descripción corta del producto..."></textarea></div>
@@ -1441,7 +1464,7 @@
       const t = r.datos.totales;
       $("#cCats").textContent = t.categorias; $("#cSubs").textContent = t.subcategorias;
       $("#cProds").textContent = t.productos.toLocaleString("es-CO"); $("#cCreados").textContent = t.creados;
-      llenarSelects(); pintarPickers(); pintarVista(); pintarListas(); await cargarProductos();
+      llenarSelects(); pintarPickers(); pintarVista(); pintarListas(); await cargarProductos(); await cargarDescuentoGeneral();
     }
 
     /* ---------- selectores (conservan lo elegido al refrescar) ---------- */
@@ -1475,7 +1498,17 @@
       $("#vistaNombre").textContent = $("#pNombre").value.trim() || "Nombre del producto";
       $("#vistaCat").textContent = cat ? `${$("#pSub").value || "—"} · ${cat.categoria}` : "";
       const p = parseFloat($("#pPrecio").value);
-      $("#vistaPrecio").textContent = p > 0 ? usd(p) : "";
+      const d = Math.max(0, Math.min(100, parseFloat($("#pDescuento")?.value) || 0));
+      if (p > 0) {
+        if (d > 0) {
+          const fin = p * (1 - d / 100);
+          $("#vistaPrecio").innerHTML = `<del class="muted" style="text-decoration:line-through;font-size:.85em">${usd(p)}</del> <b style="color:var(--naranja)">${usd(fin)}</b> <span class="etiqueta-sub" style="background:#e0f2fe;color:#0369a1;font-weight:700">-${d}%</span>`;
+        } else {
+          $("#vistaPrecio").textContent = usd(p);
+        }
+      } else {
+        $("#vistaPrecio").textContent = "";
+      }
     }
     function pintarListas() {
       $("#listaCats").innerHTML = ARBOL.map(c => `<div class="fila-cat">${tile(c.tono, c.subcategorias[0]?.icono || "box")}
@@ -1521,11 +1554,16 @@
     }
     function pintarProductos(paginas) {
       $("#gpLista").innerHTML = GP.items.length ? GP.items.map((p, i) => `<div class="gp-fila${p.activo ? "" : " oculto"}">${tile(p.tono || "ofi", p.icono || "box")}
-      <div style="min-width:0"><h3 title="${esc(p.nombre)}">${esc(p.nombre)}</h3>
-        <p class="muted">${esc(p.subcategoria)} · ${esc(p.categoria)} · <span class="id">${esc(p.product_id)}</span></p>
+      <div style="min-width:0"><h3 title="${esc(p.nombre)}">${p.marca ? `<span class="muted" style="font-weight:400;font-size:.85em">${esc(p.marca)}</span> ` : ""}${esc(p.nombre)}</h3>
+        <p class="muted">${esc(p.subcategoria)} · ${esc(p.categoria)} · <span class="id" title="ID: ${esc(p.product_id)}">${esc(p.product_id)}</span></p>
         ${p.activo ? "" : `<span class="etiqueta-sub badge-oculto">Oculto en la tienda</span>`}</div>
-      <div style="text-align:right"><div class="precio num">${usd(p.precio)}</div><p class="muted">${p.vendidos.toLocaleString("es-CO")} vendidos${p.precio_propio ? "" : " · precio del historial"}</p>
-        <p class="stock ${p.stock === 0 ? "agotado" : p.stock <= 5 ? "poco" : ""}">${p.stock === 0 ? "Agotado" : `Stock: ${p.stock.toLocaleString("es-CO")}`}</p></div>
+      <div style="text-align:right">
+        <div class="precio num">
+          ${p.descuento > 0 ? `<del class="muted" style="text-decoration:line-through;font-size:.82em">${usd(p.precio)}</del> <b style="color:var(--naranja)">${usd(p.precio_final)}</b> <span class="etiqueta-sub" style="background:#fef3c7;color:#b45309;font-weight:700">-${Math.round(p.descuento)}%</span>` : usd(p.precio)}
+        </div>
+        <p class="muted">${p.vendidos.toLocaleString("es-CO")} vendidos${p.precio_propio ? "" : " · precio del historial"}</p>
+        <p class="stock ${p.stock === 0 ? "agotado" : p.stock <= 5 ? "poco" : ""}">${p.stock === 0 ? "Agotado" : `Stock: ${p.stock.toLocaleString("es-CO")}`}</p>
+      </div>
       <div class="gp-acc">
         <button class="btn-fantasma btn-mini" data-accion="prod-editar" data-i="${i}">Editar</button>
         <button class="btn-fantasma btn-mini" data-accion="prod-alternar" data-i="${i}">${p.activo ? "Ocultar" : "Mostrar"}</button>
@@ -1576,9 +1614,28 @@
       }
     }
 
+    function actualizarPreviewDescuentoEditar() {
+      const p = parseFloat($("#edPrecio").value) || 0;
+      const d = Math.max(0, Math.min(100, parseFloat($("#edDescuento").value) || 0));
+      const el = $("#edNotaDescuento");
+      if (d > 0 && p > 0) {
+        const fin = p * (1 - d / 100);
+        const ahorro = p - fin;
+        el.textContent = `Precio con ${d}% de descuento: US$ ${fin.toFixed(2)} (Ahorro: US$ ${ahorro.toFixed(2)})`;
+        el.style.display = "block";
+      } else {
+        el.textContent = "";
+        el.style.display = "none";
+      }
+    }
+    $("#edPrecio").addEventListener("input", actualizarPreviewDescuentoEditar);
+    $("#edDescuento").addEventListener("input", actualizarPreviewDescuentoEditar);
+
     function abrirEditar(p) {
       PROD = p; $("#edErr").hidden = true;
       $("#edCodigo").textContent = p.product_id; $("#edNombre").value = p.nombre; $("#edPrecio").value = Number(p.precio).toFixed(2);
+      $("#edDescuento").value = p.descuento || 0;
+      actualizarPreviewDescuentoEditar();
       $("#edMarca").value = p.marca || "";
       $("#edDesc").value = p.descripcion || "";
       poblarFicha($("#edFilasFicha"), p.ficha);
@@ -1626,6 +1683,8 @@
       if (nombre !== PROD.nombre) cambios.nombre = nombre;
       if (categoria !== PROD.categoria || subcategoria !== PROD.subcategoria) { cambios.categoria = categoria; cambios.subcategoria = subcategoria; }
       if (Math.abs(precio - PROD.precio) > 0.004) cambios.precio = precio;
+      const descVal = Math.max(0, Math.min(100, parseFloat($("#edDescuento").value) || 0));
+      if (Math.abs(descVal - (PROD.descuento || 0)) > 0.004) cambios.descuento = descVal;
       const marca = $("#edMarca").value.trim();
       if (marca !== (PROD.marca || "")) cambios.marca = marca;
       const desc = $("#edDesc").value.trim();
@@ -1760,6 +1819,7 @@
       const marca = $("#pMarca").value.trim();
       const descripcion = $("#pDesc").value.trim();
       const ficha = leerFicha($("#pFilasFicha"));
+      const descNuevo = Math.max(0, Math.min(100, parseFloat($("#pDescuento")?.value) || 0));
       const cuerpo = {
         nombre: $("#pNombre").value.trim(),
         categoria: $("#pCat").value,
@@ -1770,14 +1830,60 @@
       if (marca) cuerpo.marca = marca;
       if (descripcion) cuerpo.descripcion = descripcion;
       if (ficha.length) cuerpo.ficha = ficha;
+      if (descNuevo > 0) cuerpo.descuento = descNuevo;
       crear(e.target, "/admin/catalogo/productos", cuerpo, $("#pErr"), async d => {
         $("#pNombre").value = ""; $("#pPrecio").value = ""; $("#pStock").value = "";
         $("#pMarca").value = ""; $("#pDesc").value = ""; $("#pFilasFicha").innerHTML = "";
+        if ($("#pDescuento")) $("#pDescuento").value = "0";
         await cargarDatos();
         const ok = $("#pOk"); ok.hidden = false;
         ok.innerHTML = `Producto «${esc(d.nombre)}» creado (${esc(d.product_id)}) con ${d.stock.toLocaleString("es-CO")} ${d.stock === 1 ? "unidad" : "unidades"}. <a href="/?q=${encodeURIComponent(d.nombre)}">Verlo en la tienda</a>`;
         aviso("Producto agregado a la tienda");
       });
+    });
+
+    $("#pPrecio").addEventListener("input", pintarVista);
+    $("#pDescuento")?.addEventListener("input", pintarVista);
+
+    /* Descuento general del catálogo */
+    async function cargarDescuentoGeneral() {
+      const r = await api("/tienda/config");
+      if (r.ok && r.datos && r.datos.descuento_general !== undefined) {
+        const d = $("#descGenPorc");
+        if (d) d.value = r.datos.descuento_general;
+      }
+    }
+    $("#btnFijarDescGen")?.addEventListener("click", async () => {
+      const val = parseFloat($("#descGenPorc").value) || 0;
+      const r = await llamarAdmin("/admin/catalogo/descuento-general", "POST", { descuento: val });
+      if (r.ok) {
+        aviso(r.datos.mensaje || `Descuento global fijado en ${val}%`);
+        await cargarDatos();
+      } else {
+        aviso((r.datos && r.datos.error) || "Error al fijar descuento");
+      }
+    });
+    $("#btnAplicarTodosDesc")?.addEventListener("click", async () => {
+      const val = parseFloat($("#descGenPorc").value) || 0;
+      if (!confirm(`¿Seguro que deseas aplicar ${val}% de descuento a TODOS los productos del catálogo?`)) return;
+      const r = await llamarAdmin("/admin/catalogo/descuento-general", "POST", { descuento: val, aplicar_a_productos: true });
+      if (r.ok) {
+        aviso(r.datos.mensaje || `Descuento de ${val}% aplicado a todos los productos`);
+        await cargarDatos();
+      } else {
+        aviso((r.datos && r.datos.error) || "Error al aplicar descuento");
+      }
+    });
+    $("#btnQuitarDescGen")?.addEventListener("click", async () => {
+      if (!confirm("¿Deseas quitar todos los descuentos globales y de productos?")) return;
+      const r = await llamarAdmin("/admin/catalogo/descuento-general", "POST", { descuento: 0, aplicar_a_productos: true });
+      if (r.ok) {
+        if ($("#descGenPorc")) $("#descGenPorc").value = 0;
+        aviso("Descuentos eliminados del catálogo");
+        await cargarDatos();
+      } else {
+        aviso((r.datos && r.datos.error) || "Error al quitar descuentos");
+      }
     });
 
     /* ---------- arranque ---------- */
@@ -1861,6 +1967,112 @@
 
 
   </script>
+<!-- VER-CLAVE:INICIO — botón de ojo para mostrar/ocultar contraseñas (usuarios y administradores) -->
+<style>
+  .ver-clave { position: relative; display: flow-root; width: 100% }
+  .ver-clave > input { padding-right: 48px !important }
+  .ver-clave input::-ms-reveal, .ver-clave input::-ms-clear { display: none }
+  .ver-clave-btn {
+    position: absolute; top: 50%; right: 6px; transform: translateY(-50%);
+    width: 36px; height: 36px; padding: 0; margin: 0; border: 0; border-radius: 50%;
+    display: grid; place-items: center; cursor: pointer;
+    background: transparent; color: var(--muted, #5b6b70);
+    transition: color .2s ease, background .2s ease;
+  }
+  .ver-clave-btn:hover { color: var(--txt, var(--ink, currentColor)); background: rgba(127, 127, 127, .16) }
+  .ver-clave-btn:focus-visible { outline: 2px solid var(--naranja, var(--teal, #ff7a2f)); outline-offset: 1px }
+  .ver-clave-btn svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; pointer-events: none }
+  .ver-clave-btn .ojo-cerrado { display: none }
+  .ver-clave-btn[aria-pressed="true"] .ojo-abierto { display: none }
+  .ver-clave-btn[aria-pressed="true"] .ojo-cerrado { display: block }
+</style>
+<script>
+  (function () {
+    var TXT = {
+      es: { mostrar: "Mostrar contraseña", ocultar: "Ocultar contraseña" },
+      en: { mostrar: "Show password", ocultar: "Hide password" }
+    };
+    function txt(k) { return (document.documentElement.lang === "en" ? TXT.en : TXT.es)[k]; }
+
+    var ICONOS =
+      '<svg class="ojo-abierto" viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>' +
+      '<svg class="ojo-cerrado" viewBox="0 0 24 24" aria-hidden="true"><path d="M17.94 17.94A10.9 10.9 0 0 1 12 19c-6.4 0-10-7-10-7a18.5 18.5 0 0 1 5.06-5.94M9.9 4.24A9.1 9.1 0 0 1 12 4c6.4 0 10 7 10 7a18.6 18.6 0 0 1-2.16 3.19M14.12 14.12a3 3 0 1 1-4.24-4.24"/><path d="M1 1l22 22"/></svg>';
+
+    function etiquetar(btn, visible) {
+      var t = txt(visible ? "ocultar" : "mostrar");
+      btn.setAttribute("aria-label", t);
+      btn.title = t;
+      btn.setAttribute("aria-pressed", visible ? "true" : "false");
+    }
+
+    function mejorar(inp) {
+      if (inp.dataset.verClave) return;
+      inp.dataset.verClave = "1";
+
+      var tenia = document.activeElement === inp;
+      var cs = getComputedStyle(inp);
+      var wrap = document.createElement("span");
+      wrap.className = "ver-clave";
+      // El margen vertical del input pasa al contenedor para que el ojo quede centrado en el campo
+      wrap.style.marginTop = cs.marginTop;
+      wrap.style.marginBottom = cs.marginBottom;
+      inp.style.marginTop = "0";
+      inp.style.marginBottom = "0";
+
+      var btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "ver-clave-btn";
+      btn.innerHTML = ICONOS;
+      etiquetar(btn, false);
+
+      inp.parentNode.insertBefore(wrap, inp);
+      wrap.appendChild(inp);
+      wrap.appendChild(btn);
+      if (tenia) inp.focus();
+
+      // Evita que el botón le quite el foco al campo al hacer clic
+      btn.addEventListener("mousedown", function (e) { e.preventDefault(); });
+      btn.addEventListener("click", function () {
+        var revelar = inp.type === "password";
+        var ini = inp.selectionStart, fin = inp.selectionEnd;
+        inp.type = revelar ? "text" : "password";
+        etiquetar(btn, revelar);
+        inp.focus({ preventScroll: true });
+        try { inp.setSelectionRange(ini, fin); } catch (e) { }
+      });
+    }
+
+    function escanear(raiz) {
+      if (!raiz || !raiz.querySelectorAll) return;
+      if (raiz.matches && raiz.matches('input[type="password"]')) mejorar(raiz);
+      var lista = raiz.querySelectorAll('input[type="password"]');
+      for (var i = 0; i < lista.length; i++) mejorar(lista[i]);
+    }
+
+    // Vuelve a ocultar todas las contraseñas reveladas
+    window.ocultarClaves = function () {
+      var btns = document.querySelectorAll('.ver-clave-btn[aria-pressed="true"]');
+      for (var i = 0; i < btns.length; i++) btns[i].click();
+    };
+
+    // Por seguridad, al enviar un formulario las contraseñas vuelven a quedar ocultas
+    document.addEventListener("submit", function (e) {
+      var btns = e.target.querySelectorAll ? e.target.querySelectorAll('.ver-clave-btn[aria-pressed="true"]') : [];
+      for (var i = 0; i < btns.length; i++) btns[i].click();
+    }, true);
+
+    escanear(document);
+    // Detecta los campos de contraseña que la app crea después (modales de login/registro, perfil, etc.)
+    new MutationObserver(function (muts) {
+      for (var i = 0; i < muts.length; i++) {
+        var nodos = muts[i].addedNodes;
+        for (var j = 0; j < nodos.length; j++) if (nodos[j].nodeType === 1) escanear(nodos[j]);
+      }
+    }).observe(document.documentElement, { childList: true, subtree: true });
+  })();
+</script>
+<!-- VER-CLAVE:FIN -->
+
 </body>
 
 </html>

@@ -2469,7 +2469,13 @@
         confirmarTurno: "Solicitar turno",
         errEligeMotivo: "Por favor elige un motivo para tu turno.",
         errDetalleOblig: "Describe tu consulta para poder atenderte.",
-        errDetalleLargo: "El detalle no puede superar los 500 caracteres."
+        errDetalleLargo: "El detalle no puede superar los 500 caracteres.",
+        agregarProducto: "Agregar producto",
+        buscarProducto: "Buscar producto…",
+        agregar: "Agregar",
+        cantidadCorta: "Cant.",
+        productoAgregado: "agregado",
+        cargoExtra: m => `Pedido actualizado. Cargo adicional: ${m}`
       },
       en: {
         menu: "Main menu", tienda: "Store", actividad: "My activity", cambiarTema: "Change theme", titulo: "My activity", volver: "Back to the store",
@@ -2521,7 +2527,13 @@
         confirmarTurno: "Request number",
         errEligeMotivo: "Please select a reason for your number.",
         errDetalleOblig: "Please describe your inquiry.",
-        errDetalleLargo: "Details cannot exceed 500 characters."
+        errDetalleLargo: "Details cannot exceed 500 characters.",
+        agregarProducto: "Add product",
+        buscarProducto: "Search product…",
+        agregar: "Add",
+        cantidadCorta: "Qty.",
+        productoAgregado: "added",
+        cargoExtra: m => `Order updated. Additional charge: ${m}`
       }
     };
     const t = (k, ...a) => { const v = I18N[CFG.lang][k] ?? I18N.es[k] ?? k; return typeof v === "function" ? v(...a) : v; };
@@ -2639,8 +2651,8 @@
     });
 
     /* ---------------- detalle: descripción + cancelar / modificar ---------------- */
-    let CANT = {}, CONFIRMA = false;
-    function abrirDetalle(p) { ABIERTO = p.order_id; CANT = {}; CONFIRMA = false; p.items.forEach(i => CANT[i.product_id + "|" + i.producto] = i.cantidad); pintarDetalle(p); $("#det").showModal(); }
+    let CANT = {}, CONFIRMA = false, NUEVOS_PRODS = [];
+    function abrirDetalle(p) { ABIERTO = p.order_id; CANT = {}; CONFIRMA = false; NUEVOS_PRODS = []; p.items.forEach(i => CANT[i.product_id + "|" + i.producto] = i.cantidad); pintarDetalle(p); $("#det").showModal(); }
     const clave = i => i.product_id + "|" + i.producto;
     const hayCambios = p => {
       const itemsCambiados = p.items.some(i => CANT[clave(i)] !== i.cantidad);
@@ -2659,7 +2671,7 @@
       }
       const envEl = $("#detEnvio");
       const envCambiado = envEl && envEl.value !== (p.opcion_envio || "");
-      return itemsCambiados || destCambiado || envCambiado;
+      return itemsCambiados || destCambiado || envCambiado || NUEVOS_PRODS.length > 0;
     };
 
     function pintarDetalle(p) {
@@ -2835,25 +2847,54 @@
     }, 1000);
 
     /* ---------------- turnos ---------------- */
-    let MOTIVOS = [];
+    let MOTIVOS = {};
     async function cargarMotivos() {
-      if (MOTIVOS.length) return MOTIVOS;
+      if (Object.keys(MOTIVOS).length) return MOTIVOS;
       const r = await pedir("/turnos/api/motivos");
-      MOTIVOS = (r.ok && Array.isArray(r.datos)) ? r.datos : [
-        "Estado de mi pedido",
-        "Cambiar o cancelar un pedido",
-        "Garantía o devolución",
-        "Problema con un pago",
-        "Información de un producto",
-        "Otra consulta"
-      ];
+      MOTIVOS = (r.ok && r.datos && typeof r.datos === "object" && !Array.isArray(r.datos)) ? r.datos : {
+        "Recogida de Pedidos web": [
+          "Estado de mi pedido",
+          "Cambiar o cancelar un pedido",
+          "Problema con un pago",
+          "Información de un producto",
+          "Otra consulta"
+        ],
+        "Garantías y Devoluciones": [
+          "Garantía o devolución",
+          "Estado de mi pedido",
+          "Problema con un pago",
+          "Otra consulta"
+        ]
+      };
       return MOTIVOS;
     }
 
     async function abrirModalTurno(servicio_id, servicio_nombre) {
-      const motivos = await cargarMotivos();
+      const todosMotivos = await cargarMotivos();
+      const motivos = todosMotivos[servicio_nombre] || Object.values(todosMotivos)[0] || [];
       const cuerpo = $("#turnoModalCuerpo");
       const tienePedidos = CUENTA && PEDIDOS && PEDIDOS.length > 0;
+
+      // Traducciones es/en para los motivos
+      const motivoI18N = {
+        es: {
+          "Estado de mi pedido": "Estado de mi pedido",
+          "Cambiar o cancelar un pedido": "Cambiar o cancelar un pedido",
+          "Garantía o devolución": "Garantía o devolución",
+          "Problema con un pago": "Problema con un pago",
+          "Información de un producto": "Información de un producto",
+          "Otra consulta": "Otra consulta"
+        },
+        en: {
+          "Estado de mi pedido": "Order status",
+          "Cambiar o cancelar un pedido": "Change or cancel an order",
+          "Garantía o devolución": "Warranty or return",
+          "Problema con un pago": "Payment issue",
+          "Información de un producto": "Product information",
+          "Otra consulta": "Other inquiry"
+        }
+      };
+      const tMotivo = m => (motivoI18N[CFG.lang] && motivoI18N[CFG.lang][m]) || m;
 
       cuerpo.innerHTML = `
         <button class="cerrar" data-accion="cerrar-dialogo" aria-label="${esc(t("cerrar"))}">&times;</button>
@@ -2866,7 +2907,7 @@
               ${motivos.map((m, idx) => `
                 <label class="op-motivo">
                   <input type="radio" name="motivoTurno" value="${esc(m)}" ${idx === 0 ? "checked" : ""}>
-                  <span>${esc(m)}</span>
+                  <span>${esc(tMotivo(m))}</span>
                 </label>
               `).join("")}
             </div>
@@ -3258,6 +3299,112 @@
 
     $$("dialog").forEach(d => d.addEventListener("click", e => { if (e.target === d) d.close(); }));
   </script>
+<!-- VER-CLAVE:INICIO — botón de ojo para mostrar/ocultar contraseñas (usuarios y administradores) -->
+<style>
+  .ver-clave { position: relative; display: flow-root; width: 100% }
+  .ver-clave > input { padding-right: 48px !important }
+  .ver-clave input::-ms-reveal, .ver-clave input::-ms-clear { display: none }
+  .ver-clave-btn {
+    position: absolute; top: 50%; right: 6px; transform: translateY(-50%);
+    width: 36px; height: 36px; padding: 0; margin: 0; border: 0; border-radius: 50%;
+    display: grid; place-items: center; cursor: pointer;
+    background: transparent; color: var(--muted, #5b6b70);
+    transition: color .2s ease, background .2s ease;
+  }
+  .ver-clave-btn:hover { color: var(--txt, var(--ink, currentColor)); background: rgba(127, 127, 127, .16) }
+  .ver-clave-btn:focus-visible { outline: 2px solid var(--naranja, var(--teal, #ff7a2f)); outline-offset: 1px }
+  .ver-clave-btn svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; pointer-events: none }
+  .ver-clave-btn .ojo-cerrado { display: none }
+  .ver-clave-btn[aria-pressed="true"] .ojo-abierto { display: none }
+  .ver-clave-btn[aria-pressed="true"] .ojo-cerrado { display: block }
+</style>
+<script>
+  (function () {
+    var TXT = {
+      es: { mostrar: "Mostrar contraseña", ocultar: "Ocultar contraseña" },
+      en: { mostrar: "Show password", ocultar: "Hide password" }
+    };
+    function txt(k) { return (document.documentElement.lang === "en" ? TXT.en : TXT.es)[k]; }
+
+    var ICONOS =
+      '<svg class="ojo-abierto" viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>' +
+      '<svg class="ojo-cerrado" viewBox="0 0 24 24" aria-hidden="true"><path d="M17.94 17.94A10.9 10.9 0 0 1 12 19c-6.4 0-10-7-10-7a18.5 18.5 0 0 1 5.06-5.94M9.9 4.24A9.1 9.1 0 0 1 12 4c6.4 0 10 7 10 7a18.6 18.6 0 0 1-2.16 3.19M14.12 14.12a3 3 0 1 1-4.24-4.24"/><path d="M1 1l22 22"/></svg>';
+
+    function etiquetar(btn, visible) {
+      var t = txt(visible ? "ocultar" : "mostrar");
+      btn.setAttribute("aria-label", t);
+      btn.title = t;
+      btn.setAttribute("aria-pressed", visible ? "true" : "false");
+    }
+
+    function mejorar(inp) {
+      if (inp.dataset.verClave) return;
+      inp.dataset.verClave = "1";
+
+      var tenia = document.activeElement === inp;
+      var cs = getComputedStyle(inp);
+      var wrap = document.createElement("span");
+      wrap.className = "ver-clave";
+      // El margen vertical del input pasa al contenedor para que el ojo quede centrado en el campo
+      wrap.style.marginTop = cs.marginTop;
+      wrap.style.marginBottom = cs.marginBottom;
+      inp.style.marginTop = "0";
+      inp.style.marginBottom = "0";
+
+      var btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "ver-clave-btn";
+      btn.innerHTML = ICONOS;
+      etiquetar(btn, false);
+
+      inp.parentNode.insertBefore(wrap, inp);
+      wrap.appendChild(inp);
+      wrap.appendChild(btn);
+      if (tenia) inp.focus();
+
+      // Evita que el botón le quite el foco al campo al hacer clic
+      btn.addEventListener("mousedown", function (e) { e.preventDefault(); });
+      btn.addEventListener("click", function () {
+        var revelar = inp.type === "password";
+        var ini = inp.selectionStart, fin = inp.selectionEnd;
+        inp.type = revelar ? "text" : "password";
+        etiquetar(btn, revelar);
+        inp.focus({ preventScroll: true });
+        try { inp.setSelectionRange(ini, fin); } catch (e) { }
+      });
+    }
+
+    function escanear(raiz) {
+      if (!raiz || !raiz.querySelectorAll) return;
+      if (raiz.matches && raiz.matches('input[type="password"]')) mejorar(raiz);
+      var lista = raiz.querySelectorAll('input[type="password"]');
+      for (var i = 0; i < lista.length; i++) mejorar(lista[i]);
+    }
+
+    // Vuelve a ocultar todas las contraseñas reveladas
+    window.ocultarClaves = function () {
+      var btns = document.querySelectorAll('.ver-clave-btn[aria-pressed="true"]');
+      for (var i = 0; i < btns.length; i++) btns[i].click();
+    };
+
+    // Por seguridad, al enviar un formulario las contraseñas vuelven a quedar ocultas
+    document.addEventListener("submit", function (e) {
+      var btns = e.target.querySelectorAll ? e.target.querySelectorAll('.ver-clave-btn[aria-pressed="true"]') : [];
+      for (var i = 0; i < btns.length; i++) btns[i].click();
+    }, true);
+
+    escanear(document);
+    // Detecta los campos de contraseña que la app crea después (modales de login/registro, perfil, etc.)
+    new MutationObserver(function (muts) {
+      for (var i = 0; i < muts.length; i++) {
+        var nodos = muts[i].addedNodes;
+        for (var j = 0; j < nodos.length; j++) if (nodos[j].nodeType === 1) escanear(nodos[j]);
+      }
+    }).observe(document.documentElement, { childList: true, subtree: true });
+  })();
+</script>
+<!-- VER-CLAVE:FIN -->
+
 </body>
 
 </html>

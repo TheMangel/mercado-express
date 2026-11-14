@@ -432,6 +432,14 @@ dialog[open]::backdrop{background:rgba(8,5,14,.38);backdrop-filter:blur(12px);-w
       <button class="cuenta-b" id="btnCuenta" data-accion="cuenta"></button>
     </header>
 
+    <div id="bannerPromoGlobal" class="banner-promo-global" hidden style="background:linear-gradient(90deg, #ea580c, #f97316);color:#fff;padding:12px 20px;border-radius:14px;margin-bottom:16px;display:flex;align-items:center;justify-content:space-between;box-shadow:0 4px 14px rgba(234,88,12,0.22)">
+      <div style="display:flex;align-items:center;gap:12px">
+        <span style="font-size:1.4rem">🏷️</span>
+        <b id="txtBannerPromo">¡Gran Promoción! Descuentos especiales activos en la tienda</b>
+      </div>
+      <button class="btn-blanco btn-mini" data-ir="productos" style="background:#fff;color:#ea580c;border:none;font-weight:700;padding:6px 14px;border-radius:8px;cursor:pointer">Ver ofertas</button>
+    </div>
+
     <section class="top">
       <article class="card hero">
         <div class="hero-txt">
@@ -545,6 +553,9 @@ const I18N = {
     quitarUna: "Quitar una unidad", sumarUna: "Agregar una unidad", menos: "Menos", mas: "Más",
     agregado: n => `Agregado al carrito: ${n}`, carritoVaciado: "Carrito vaciado",
     descVendido: p => `Se ha vendido con descuentos de hasta ${p}%.`, unidadesVendidas: n => `${entero(n)} unidades vendidas`, comprarAhora: "Comprar ahora",
+    ahorroDto: (m, p) => `¡Ahorras ${m} (${p}% de descuento)!`,
+    bannerPromo: d => `¡Promoción en la tienda: ${d}% de descuento en productos!`,
+    bannerPromoMax: d => `¡Aprovecha hasta ${d}% de descuento en productos seleccionados!`,
     marca: "Marca", descripcion: "Descripción", caracteristicas: "Características",
     casiListo: "Casi listo", pagoResumen: (n, t) => `Tu pedido tiene <b>${n}</b> ${n === 1 ? "producto" : "productos"} por <b class="num" style="color:var(--precio)">${t}</b>.`,
     pagoSinCuenta: "Para terminar la compra necesitas una cuenta de cliente con autorización de tratamiento de datos (Ley 1581 de 2012). El pago todavía no está disponible en este prototipo. Tu carrito se queda guardado en este navegador.",
@@ -605,6 +616,9 @@ const I18N = {
     quitarUna: "Remove one unit", sumarUna: "Add one unit", menos: "Less", mas: "More",
     agregado: n => `Added to cart: ${n}`, carritoVaciado: "Cart emptied",
     descVendido: p => `This product has sold with discounts of up to ${p}%.`, unidadesVendidas: n => `${entero(n)} units sold`, comprarAhora: "Buy now",
+    ahorroDto: (m, p) => `You save ${m} (${p}% off)!`,
+    bannerPromo: d => `Special store promotion: ${d}% OFF on products!`,
+    bannerPromoMax: d => `Up to ${d}% discount on selected items!`,
     marca: "Brand", descripcion: "Description", caracteristicas: "Specifications",
     casiListo: "Almost there", pagoResumen: (n, t) => `Your order has <b>${n}</b> ${n === 1 ? "product" : "products"} for <b class="num" style="color:var(--precio)">${t}</b>.`,
     pagoSinCuenta: "To finish the purchase you need a customer account with consent for data processing (Colombian Law 1581 of 2012). Payment is not available yet in this prototype. Your cart stays saved in this browser.",
@@ -699,13 +713,22 @@ function avisoStock(p) {
 
 function tarjeta(p) {
   const k = esc(clave(p));
-  const dto = p.descuento_max > 0 ? `<span class="dto">${t("hastaDto", Math.round(p.descuento_max * 100))}</span>` : "";
+  const descPorc = p.descuento_efectivo || p.descuento || 0;
+  let dto = "";
+  let precioHtml = `<p class="precio">${din(p.precio)}</p>`;
+  if (descPorc > 0) {
+    dto = `<span class="dto">-${Math.round(descPorc)}%</span>`;
+    const precioFinal = p.precio_final || (p.precio * (1 - descPorc / 100));
+    precioHtml = `<p class="precio"><del class="tachado" style="font-size:.82em;text-decoration:line-through;color:var(--muted);font-weight:400;margin-right:6px">${din(p.precio)}</del><span style="color:var(--precio);font-weight:700">${din(precioFinal)}</span></p>`;
+  } else if (p.descuento_max > 0) {
+    dto = `<span class="dto">${t("hastaDto", Math.round(p.descuento_max * 100))}</span>`;
+  }
   return `<article class="prod">
     <button class="prod-img" data-accion="ver" data-k="${k}" aria-label="${esc(p.nombre)}">${tile(p)}${dto}</button>
     <div class="prod-cuerpo">
       <h3 title="${esc(p.nombre)}">${esc(p.nombre)}</h3>
       <p class="muted">${esc(subL(p.subcategoria))} · ${esc(catL(p.categoria))}</p>
-      <p class="precio">${din(p.precio)}</p>
+      ${precioHtml}
       <p class="muted">${t("nVendidos", p.vendidos)}</p>
       ${avisoStock(p)}
       <div class="prod-acc"><button class="btn-blanco" data-accion="agregar" data-k="${k}">${t("agregarCarrito")}</button></div>
@@ -782,14 +805,41 @@ function pintarPortada() {
   const cifras = [[res.productos, entero], [res.pedidos, entero], [res.categorias, v => v], [Math.round(res.descuento_max * 100), v => v + "%"]];
   cifras.forEach(([valor, fmt], i) => { if (CONTAR) contar(s[i], valor, fmt); else s[i].textContent = fmt(valor); });
   CONTAR = false;     // el conteo animado solo ocurre en la primera carga
-  $("#topLista").innerHTML = top.slice(0, 5).map(p => `<div class="fila-top">${tile(p)}
+
+  const banner = $("#bannerPromoGlobal");
+  if (banner) {
+    const hayDesc = (res.descuento_general > 0) || (res.descuento_max > 0);
+    banner.hidden = !hayDesc;
+    if (hayDesc) {
+      const txt = $("#txtBannerPromo");
+      if (txt) {
+        txt.textContent = res.descuento_general > 0
+          ? t("bannerPromo", Math.round(res.descuento_general))
+          : t("bannerPromoMax", Math.round(res.descuento_max * 100));
+      }
+    }
+  }
+
+  $("#topLista").innerHTML = top.slice(0, 5).map(p => {
+    const descPorc = p.descuento_efectivo || p.descuento || 0;
+    const precioFinal = p.precio_final || (p.precio * (1 - descPorc / 100));
+    const prHtml = descPorc > 0
+      ? `<div class="precio num"><del class="muted" style="text-decoration:line-through;font-size:.8em;margin-right:4px">${din(p.precio)}</del><span style="color:var(--precio)">${din(precioFinal)}</span></div>`
+      : `<div class="precio num">${din(p.precio)}</div>`;
+    return `<div class="fila-top">${tile(p)}
       <div style="min-width:0"><h3 title="${esc(p.nombre)}">${esc(p.nombre)}</h3><p class="muted">${esc(subL(p.subcategoria))} · ${esc(catL(p.categoria))}</p></div>
-      <div class="vend num">${t("nVendidos", p.vendidos)}</div><div class="precio num">${din(p.precio)}</div>
-      <div><button class="btn-blanco" style="padding:10px 18px" data-accion="agregar" data-k="${esc(clave(p))}">${t("agregar")}</button></div></div>`).join("");
+      <div class="vend num">${t("nVendidos", p.vendidos)}</div>${prHtml}
+      <div><button class="btn-blanco" style="padding:10px 18px" data-accion="agregar" data-k="${esc(clave(p))}">${t("agregar")}</button></div></div>`;
+  }).join("");
   const dia = top[Math.floor(Date.now() / 864e5) % top.length], kd = esc(clave(dia));
+  const descDia = dia.descuento_efectivo || dia.descuento || 0;
+  const precioDiaFin = dia.precio_final || (dia.precio * (1 - descDia / 100));
+  const precioDiaHtml = descDia > 0
+    ? `<p class="precio"><del class="muted" style="text-decoration:line-through;font-size:.8em;margin-right:4px">${din(dia.precio)}</del><span style="color:var(--precio);font-weight:700">${din(precioDiaFin)}</span></p>`
+    : `<p class="precio">${din(dia.precio)}</p>`;
   $("#dia").innerHTML = `<h2>${t("dia")}</h2>
     <div class="fila">${tile(dia)}<div style="min-width:0"><h3>${esc(dia.nombre)}</h3><p class="muted">${t("nVendidos", dia.vendidos)}</p></div></div>
-    <p class="precio">${din(dia.precio)}</p>${avisoStock(dia)}
+    ${precioDiaHtml}${avisoStock(dia)}
     <div class="acc"><button class="btn-blanco" data-accion="agregar" data-k="${kd}">${t("agregarCarrito")}</button><button class="btn-fantasma" data-accion="ver" data-k="${kd}">${t("verDetalle")}</button></div>`;
   $("#deco").innerHTML = [[top[2], "t1"], [top[0], "t2"], [top[5], "t3"]].map(([p, c]) => tile(p, c)).join("");
 }
@@ -798,7 +848,9 @@ async function cargarPortada() {
     const [res, cats, top, conf] = await Promise.all([
       fetch("/tienda/resumen").then(r => r.json()), fetch("/tienda/categorias").then(r => r.json()),
       fetch("/tienda/productos?limite=10&orden=vendidos").then(r => r.json()), fetch("/tienda/config").then(r => r.json())]);
-    ARBOL = cats; TASA = conf.tasa_cop || TASA; registrar(top.resultados);
+    ARBOL = cats; TASA = conf.tasa_cop || TASA;
+    res.descuento_general = conf.descuento_general || 0;
+    registrar(top.resultados);
     PORTADA = {res, top: top.resultados};
     pintarFiltros(); pintarPortada(); pintarCarrito(); pintarGrilla();
   } catch (e) {
@@ -810,13 +862,18 @@ async function cargarPortada() {
 let carrito = (() => { try { return JSON.parse(localStorage.getItem("me_carrito") || "{}"); } catch (e) { return {}; } })();
 const guardarCarrito = () => { try { localStorage.setItem("me_carrito", JSON.stringify(carrito)); } catch (e) {} };
 const cantTotal = () => Object.values(carrito).reduce((s, i) => s + i.cant, 0);
-const lineaMoneda = i => enMoneda(i.cant * i.p.precio);
+const precioItem = p => (p.precio_final !== undefined && p.precio_final !== null) ? p.precio_final : p.precio;
+const lineaMoneda = i => enMoneda(i.cant * precioItem(i.p));
 const sumaMoneda = () => { const s = Object.values(carrito).reduce((a, i) => a + lineaMoneda(i), 0); return CFG.moneda === "COP" ? s : Math.round(s * 100) / 100; };
 
 function agregar(k, n = 1, avisar = true) {
   const p = CATALOGO.get(k) || carrito[k]?.p;
   if (!p) return;
-  if (!carrito[k]) carrito[k] = {p: {product_id: p.product_id, nombre: p.nombre, categoria: p.categoria, subcategoria: p.subcategoria, precio: p.precio, tono: p.tono, icono: p.icono}, cant: 0};
+  if (!carrito[k]) carrito[k] = {p: {product_id: p.product_id, nombre: p.nombre, categoria: p.categoria, subcategoria: p.subcategoria, precio: p.precio, precio_final: p.precio_final, descuento: p.descuento, tono: p.tono, icono: p.icono}, cant: 0};
+  else if (p.precio_final !== undefined) {
+    carrito[k].p.precio_final = p.precio_final;
+    carrito[k].p.precio = p.precio;
+  }
   carrito[k].cant = Math.min(99, carrito[k].cant + n);
   guardarCarrito(); pintarCarrito(); rebotarInsignia();
   if (avisar) aviso(t("agregado", p.nombre));
@@ -846,7 +903,16 @@ function aviso(txt) { const el = $("#toast"); el.textContent = txt; el.classList
 /* ---- detalle del producto ---- */
 function verDetalle(k) {
   const p = CATALOGO.get(k); if (!p) return;
-  const dto = p.descuento_max > 0 ? `<p class="muted">${t("descVendido", Math.round(p.descuento_max * 100))}</p>` : "";
+  const descPorc = p.descuento_efectivo || p.descuento || 0;
+  let precioDetHtml = `<p class="precio">${din(p.precio)}</p>`;
+  let dto = "";
+  if (descPorc > 0) {
+    const precioFinal = p.precio_final || (p.precio * (1 - descPorc / 100));
+    precioDetHtml = `<p class="precio"><del class="tachado" style="font-size:.82em;text-decoration:line-through;color:var(--muted);font-weight:400;margin-right:6px">${din(p.precio)}</del><span style="color:var(--precio);font-weight:700">${din(precioFinal)}</span> <span class="dto-badge" style="background:#fef3c7;color:#b45309;font-size:.8rem;font-weight:700;padding:2px 8px;border-radius:6px;vertical-align:middle">-${Math.round(descPorc)}% OFF</span></p>`;
+    dto = `<p class="muted" style="color:var(--naranja);font-weight:600">${t("ahorroDto", din(p.precio - precioFinal), Math.round(descPorc))}</p>`;
+  } else if (p.descuento_max > 0) {
+    dto = `<p class="muted">${t("descVendido", Math.round(p.descuento_max * 100))}</p>`;
+  }
   const marcaHtml = p.marca ? `<span class="det-marca">${esc(p.marca)}</span>` : "";
   const descHtml = p.descripcion ? `<p class="det-desc">${esc(p.descripcion)}</p>` : "";
   const fichaHtml = (p.ficha && Array.isArray(p.ficha) && p.ficha.length) ? `
@@ -863,7 +929,7 @@ function verDetalle(k) {
       ${marcaHtml}
       <h2>${esc(p.nombre)}</h2>
       <p class="muted">${esc(subL(p.subcategoria))} · ${esc(catL(p.categoria))}</p>
-      <p class="precio">${din(p.precio)}</p>${dto}<p class="muted">${t("unidadesVendidas", p.vendidos)} · <span class="id">${esc(p.product_id)}</span></p>
+      ${precioDetHtml}${dto}<p class="muted">${t("unidadesVendidas", p.vendidos)} · <span class="id">${esc(p.product_id)}</span></p>
       ${descHtml}
       ${avisoStock(p)}
       <div class="acc"><span class="paso"><button data-accion="det-menos" aria-label="${t("menos")}">−</button><span id="detCant">1</span><button data-accion="det-mas" aria-label="${t("mas")}">+</button></span>
@@ -1334,6 +1400,122 @@ pintarCarrito(); pintarCuentaBtn();
 try { const q0 = new URLSearchParams(location.search).get("q"); if (q0) { E.q = q0.slice(0, 80); $("#q").value = E.q; } } catch (e) {}
 cargarUbic(); cargarPortada(); cargarProductos(); cargarCuenta();
 if (E.q) setTimeout(() => irA("productos"), 700);
+
+// Actualización en tiempo real de catálogo y descuentos
+setInterval(async () => {
+  if (document.visibilityState === "visible") {
+    try {
+      await cargarPortada();
+      await cargarProductos();
+    } catch (e) {}
+  }
+}, 10000);
 </script>
+<!-- VER-CLAVE:INICIO — botón de ojo para mostrar/ocultar contraseñas (usuarios y administradores) -->
+<style>
+  .ver-clave { position: relative; display: flow-root; width: 100% }
+  .ver-clave > input { padding-right: 48px !important }
+  .ver-clave input::-ms-reveal, .ver-clave input::-ms-clear { display: none }
+  .ver-clave-btn {
+    position: absolute; top: 50%; right: 6px; transform: translateY(-50%);
+    width: 36px; height: 36px; padding: 0; margin: 0; border: 0; border-radius: 50%;
+    display: grid; place-items: center; cursor: pointer;
+    background: transparent; color: var(--muted, #5b6b70);
+    transition: color .2s ease, background .2s ease;
+  }
+  .ver-clave-btn:hover { color: var(--txt, var(--ink, currentColor)); background: rgba(127, 127, 127, .16) }
+  .ver-clave-btn:focus-visible { outline: 2px solid var(--naranja, var(--teal, #ff7a2f)); outline-offset: 1px }
+  .ver-clave-btn svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; pointer-events: none }
+  .ver-clave-btn .ojo-cerrado { display: none }
+  .ver-clave-btn[aria-pressed="true"] .ojo-abierto { display: none }
+  .ver-clave-btn[aria-pressed="true"] .ojo-cerrado { display: block }
+</style>
+<script>
+  (function () {
+    var TXT = {
+      es: { mostrar: "Mostrar contraseña", ocultar: "Ocultar contraseña" },
+      en: { mostrar: "Show password", ocultar: "Hide password" }
+    };
+    function txt(k) { return (document.documentElement.lang === "en" ? TXT.en : TXT.es)[k]; }
+
+    var ICONOS =
+      '<svg class="ojo-abierto" viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>' +
+      '<svg class="ojo-cerrado" viewBox="0 0 24 24" aria-hidden="true"><path d="M17.94 17.94A10.9 10.9 0 0 1 12 19c-6.4 0-10-7-10-7a18.5 18.5 0 0 1 5.06-5.94M9.9 4.24A9.1 9.1 0 0 1 12 4c6.4 0 10 7 10 7a18.6 18.6 0 0 1-2.16 3.19M14.12 14.12a3 3 0 1 1-4.24-4.24"/><path d="M1 1l22 22"/></svg>';
+
+    function etiquetar(btn, visible) {
+      var t = txt(visible ? "ocultar" : "mostrar");
+      btn.setAttribute("aria-label", t);
+      btn.title = t;
+      btn.setAttribute("aria-pressed", visible ? "true" : "false");
+    }
+
+    function mejorar(inp) {
+      if (inp.dataset.verClave) return;
+      inp.dataset.verClave = "1";
+
+      var tenia = document.activeElement === inp;
+      var cs = getComputedStyle(inp);
+      var wrap = document.createElement("span");
+      wrap.className = "ver-clave";
+      // El margen vertical del input pasa al contenedor para que el ojo quede centrado en el campo
+      wrap.style.marginTop = cs.marginTop;
+      wrap.style.marginBottom = cs.marginBottom;
+      inp.style.marginTop = "0";
+      inp.style.marginBottom = "0";
+
+      var btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "ver-clave-btn";
+      btn.innerHTML = ICONOS;
+      etiquetar(btn, false);
+
+      inp.parentNode.insertBefore(wrap, inp);
+      wrap.appendChild(inp);
+      wrap.appendChild(btn);
+      if (tenia) inp.focus();
+
+      // Evita que el botón le quite el foco al campo al hacer clic
+      btn.addEventListener("mousedown", function (e) { e.preventDefault(); });
+      btn.addEventListener("click", function () {
+        var revelar = inp.type === "password";
+        var ini = inp.selectionStart, fin = inp.selectionEnd;
+        inp.type = revelar ? "text" : "password";
+        etiquetar(btn, revelar);
+        inp.focus({ preventScroll: true });
+        try { inp.setSelectionRange(ini, fin); } catch (e) { }
+      });
+    }
+
+    function escanear(raiz) {
+      if (!raiz || !raiz.querySelectorAll) return;
+      if (raiz.matches && raiz.matches('input[type="password"]')) mejorar(raiz);
+      var lista = raiz.querySelectorAll('input[type="password"]');
+      for (var i = 0; i < lista.length; i++) mejorar(lista[i]);
+    }
+
+    // Vuelve a ocultar todas las contraseñas reveladas
+    window.ocultarClaves = function () {
+      var btns = document.querySelectorAll('.ver-clave-btn[aria-pressed="true"]');
+      for (var i = 0; i < btns.length; i++) btns[i].click();
+    };
+
+    // Por seguridad, al enviar un formulario las contraseñas vuelven a quedar ocultas
+    document.addEventListener("submit", function (e) {
+      var btns = e.target.querySelectorAll ? e.target.querySelectorAll('.ver-clave-btn[aria-pressed="true"]') : [];
+      for (var i = 0; i < btns.length; i++) btns[i].click();
+    }, true);
+
+    escanear(document);
+    // Detecta los campos de contraseña que la app crea después (modales de login/registro, perfil, etc.)
+    new MutationObserver(function (muts) {
+      for (var i = 0; i < muts.length; i++) {
+        var nodos = muts[i].addedNodes;
+        for (var j = 0; j < nodos.length; j++) if (nodos[j].nodeType === 1) escanear(nodos[j]);
+      }
+    }).observe(document.documentElement, { childList: true, subtree: true });
+  })();
+</script>
+<!-- VER-CLAVE:FIN -->
+
 </body>
 </html>

@@ -66,7 +66,13 @@ CREATE TABLE IF NOT EXISTS productos (
     marca        TEXT,
     descripcion  TEXT,
     ficha        TEXT,
+    descuento    REAL NOT NULL DEFAULT 0 CHECK (descuento >= 0 AND descuento <= 100), -- porcentaje de descuento (0 a 100)
     PRIMARY KEY (product_id, product_name)   -- llave compuesta: un mismo ID se usó para 2 productos
+);
+
+CREATE TABLE IF NOT EXISTS configuracion (
+    clave TEXT PRIMARY KEY,
+    valor TEXT NOT NULL
 );
 
 -- Categorías del catálogo (se pueden crear desde /admin/catalogo, aunque aún no tengan productos)

@@ -42,13 +42,13 @@ def c(app_tur):
 
 
 def test_endpoint_motivos(c):
-    """GET /turnos/api/motivos es público y devuelve la lista de motivos permitidos."""
+    """GET /turnos/api/motivos es público y devuelve la lista de motivos permitidos por servicio."""
     r = c.get("/turnos/api/motivos")
     assert r.status_code == 200
     datos = r.get_json()
-    assert isinstance(datos, list)
-    assert "Estado de mi pedido" in datos
-    assert "Otra consulta" in datos
+    assert isinstance(datos, dict)
+    assert "Estado de mi pedido" in datos["Recogida de Pedidos web"]
+    assert "Otra consulta" in datos["Recogida de Pedidos web"]
     assert datos == MOTIVOS_TURNO
 
 
@@ -72,13 +72,23 @@ def test_motivo_valido_y_con_detalle_opcional(app_tur, c):
 
 
 def test_motivo_inventado_422(c):
-    """Motivo fuera de la lista permitida responde 422."""
+    """Motivo fuera de la lista permitida responde 400."""
     r = c.post("/turnos/api/pedir", json={
         "servicio_id": 1,
         "motivo": "Motivo que no existe"
     })
-    assert r.status_code == 422
-    assert "motivo" in str(r.get_json())
+    assert r.status_code == 400
+    assert "motivo" in str(r.get_json()).lower()
+
+
+def test_motivo_invalido_para_servicio(c):
+    """Motivo que no pertenece al servicio elegido responde 400."""
+    r = c.post("/turnos/api/pedir", json={
+        "servicio_id": 2,  # Garantías y Devoluciones
+        "motivo": "Cambiar o cancelar un pedido"  # Solo permitido en Recogida de Pedidos web
+    })
+    assert r.status_code == 400
+    assert "motivo" in str(r.get_json()).lower()
 
 
 def test_motivo_faltante_422(c):

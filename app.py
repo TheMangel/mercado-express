@@ -44,10 +44,10 @@ RUTAS_PUBLICAS = {"salud", "favicon", "pagina_tienda", "pagina_admin", "pagina_c
                   "editar_categoria", "editar_subcategoria",
                   # Sección de administradores: no usan X-API-Key, usan cuenta con rol admin + sesión.
                   # Las que cambian datos llaman a requiere_admin() y rechazan a quien no lo sea.
-                  "admin_registro", "admin_entrar", "admin_yo",
+                  "admin_registro", "admin_entrar", "admin_salir", "admin_yo",
                   "catalogo_datos", "catalogo_categoria", "catalogo_subcategoria", "catalogo_producto",
                   "catalogo_productos_lista", "catalogo_producto_ver", "catalogo_producto_editar",
-                  "catalogo_producto_borrar"}
+                  "catalogo_producto_borrar", "catalogo_descuento_general"}
 
 # Opciones de apariencia que puede elegir un administrador (la base también las valida con CHECK)
 TONOS = {"mue", "tec", "ofi", "nat", "mar"}
@@ -61,17 +61,28 @@ STOCK_MAXIMO = 1_000_000                                                # unidad
 STOCK_AVISO = 50      # desde aquí (50 o menos) la tienda le muestra al cliente cuántas unidades quedan
 STOCK_CRITICO = 10    # con 10 o menos el aviso se resalta más
 
-MOTIVOS_TURNO = [
-    "Estado de mi pedido",
-    "Cambiar o cancelar un pedido",
-    "Garantía o devolución",
-    "Problema con un pago",
-    "Información de un producto",
-    "Otra consulta",
-]
+MOTIVOS_TURNO = {
+    "Recogida de Pedidos web": [
+        "Estado de mi pedido",
+        "Cambiar o cancelar un pedido",
+        "Garantía o devolución",
+        "Problema con un pago",
+        "Información de un producto",
+        "Otra consulta",
+    ],
+    "Garantías y Devoluciones": [
+        "Garantía o devolución",
+        "Estado de mi pedido",
+        "Problema con un pago",
+        "Otra consulta",
+    ],
+}
+# Todos los motivos únicos (compatibilidad hacia atrás con turnos ya guardados)
+TODOS_LOS_MOTIVOS = sorted(set(m for ms in MOTIVOS_TURNO.values() for m in ms))
 
 EMAIL_RE = re.compile(r"^[^@\s]{1,64}@[^@\s]{1,185}\.[^@\s]{2,}$")
-COOKIE_SESION = "me_sesion"
+COOKIE_SESION = "me_sesion"                 # sesión del cliente de la tienda
+COOKIE_SESION_ADMIN = "me_sesion_admin"     # sesión del administrador (independiente de la del cliente)
 DURACION_SESION = 7 * 24 * 3600      # 7 días
 MAX_INTENTOS, VENTANA_INTENTOS = 5, 600   # 5 intentos fallidos cada 10 minutos
 
@@ -111,6 +122,10 @@ def migrar(conn):
     for col_prod in ("marca", "descripcion", "ficha"):
         if col_prod not in cols("productos"):
             conn.execute(f"ALTER TABLE productos ADD COLUMN {col_prod} TEXT")
+    if "descuento" not in cols("productos"):
+        conn.execute("ALTER TABLE productos ADD COLUMN descuento REAL NOT NULL DEFAULT 0 CHECK (descuento >= 0 AND descuento <= 100)")
+    conn.execute("CREATE TABLE IF NOT EXISTS configuracion (clave TEXT PRIMARY KEY, valor TEXT NOT NULL)")
+    conn.execute("INSERT OR IGNORE INTO configuracion (clave, valor) VALUES ('descuento_general', '0')")
     if "cuenta_id" not in cols("turnos"):
         conn.execute("ALTER TABLE turnos ADD COLUMN cuenta_id INTEGER REFERENCES cuentas(id)")
     # Motivo del turno (Tarea 1): bases que ya tenían la tabla sin estas columnas
@@ -474,6 +489,14 @@ def create_app(config=None):
                     "LEFT JOIN categorias c ON c.nombre = p.category "
                     "LEFT JOIN subcategorias s ON s.categoria = p.category AND s.nombre = p.sub_category")
 
+    def _descuento_general(conn=None):
+        try:
+            c = conn or db()
+            row = c.execute("SELECT valor FROM configuracion WHERE clave = 'descuento_general'").fetchone()
+            return float(row["valor"]) if row and row["valor"] else 0.0
+        except Exception:
+            return 0.0
+
     @app.get("/tienda/productos")
     def tienda_productos():
         pagina, limite, offset = _paginacion(12)
@@ -493,29 +516,42 @@ def create_app(config=None):
         donde = ("WHERE " + " AND ".join(filtros)) if filtros else ""
         base = f"{UNION_PRECIO} {donde} GROUP BY p.product_id, p.product_name, c.tono, s.icono"
         total = db().execute(f"SELECT COUNT(*) FROM (SELECT 1 {base})", params).fetchone()[0]
+        desc_gen = _descuento_general()
         filas = db().execute(f"""
             SELECT p.product_id, p.product_name, p.category, p.sub_category,
-                   p.marca, p.descripcion, p.ficha,
+                   p.marca, p.descripcion, p.ficha, COALESCE(p.descuento, 0) AS descuento,
                    COALESCE(p.precio, ROUND(AVG(d.sales / (d.quantity * (1 - d.discount))), 2)) AS precio,
                    COALESCE(SUM(d.quantity), 0) AS vendidos,
                    COALESCE(MAX(d.discount), 0) AS descuento_max, p.stock AS stock,
                    c.tono AS tono, s.icono AS icono
             {base} ORDER BY {ORDENES_TIENDA[orden]} LIMIT ? OFFSET ?""", params + [limite, offset]).fetchall()
-        return jsonify({"pagina": pagina, "limite": limite, "total": total, "resultados": [
-            {"product_id": r["product_id"], "nombre": r["product_name"], "categoria": r["category"],
-             "subcategoria": r["sub_category"], "precio": r["precio"], "vendidos": r["vendidos"],
-             "descuento_max": r["descuento_max"], "tono": r["tono"], "icono": r["icono"],
-             "marca": r["marca"], "descripcion": r["descripcion"], "ficha": _deserializar_ficha(r["ficha"]),
-             # El stock exacto solo se publica cuando ya quedan pocas unidades; con más, va null
-             # (así la tienda no regala el inventario completo a quien consulte la API).
-             "stock": r["stock"] if r["stock"] <= STOCK_AVISO else None,
-             "stock_nivel": nivel_stock(r["stock"])} for r in filas]})
+        resultados = []
+        for r in filas:
+            p_desc = float(r["descuento"] or 0)
+            efectivo = max(p_desc, desc_gen)
+            p_orig = r["precio"]
+            p_fin = round(p_orig * (1.0 - efectivo / 100.0), 2) if p_orig is not None else None
+            resultados.append({
+                "product_id": r["product_id"], "nombre": r["product_name"], "categoria": r["category"],
+                "subcategoria": r["sub_category"], "precio": p_orig, "precio_final": p_fin,
+                "descuento": p_desc, "descuento_general": desc_gen, "descuento_efectivo": efectivo,
+                "vendidos": r["vendidos"],
+                "descuento_max": max(r["descuento_max"] or 0, round(efectivo / 100.0, 2)),
+                "tono": r["tono"], "icono": r["icono"],
+                "marca": r["marca"], "descripcion": r["descripcion"], "ficha": _deserializar_ficha(r["ficha"]),
+                # El stock exacto solo se publica cuando ya quedan pocas unidades; con más, va null
+                # (así la tienda no regala el inventario completo a quien consulte la API).
+                "stock": r["stock"] if r["stock"] <= STOCK_AVISO else None,
+                "stock_nivel": nivel_stock(r["stock"])
+            })
+        return jsonify({"pagina": pagina, "limite": limite, "total": total, "descuento_general": desc_gen, "resultados": resultados})
 
     @app.get("/tienda/productos/<product_id>")
     def tienda_producto_detalle(product_id):
+        desc_gen = _descuento_general()
         sql = f"""
             SELECT p.product_id, p.product_name, p.category, p.sub_category,
-                   p.marca, p.descripcion, p.ficha,
+                   p.marca, p.descripcion, p.ficha, COALESCE(p.descuento, 0) AS descuento,
                    COALESCE(p.precio, ROUND(AVG(d.sales / (d.quantity * (1 - d.discount))), 2)) AS precio,
                    COALESCE(SUM(d.quantity), 0) AS vendidos,
                    COALESCE(MAX(d.discount), 0) AS descuento_max, p.stock AS stock,
@@ -526,10 +562,17 @@ def create_app(config=None):
         if not filas:
             raise ErrorApi(404, f"Producto no encontrado: {product_id}")
         r = filas[0]
+        p_desc = float(r["descuento"] or 0)
+        efectivo = max(p_desc, desc_gen)
+        p_orig = r["precio"]
+        p_fin = round(p_orig * (1.0 - efectivo / 100.0), 2) if p_orig is not None else None
         return jsonify({
             "product_id": r["product_id"], "nombre": r["product_name"], "categoria": r["category"],
-            "subcategoria": r["sub_category"], "precio": r["precio"], "vendidos": r["vendidos"],
-            "descuento_max": r["descuento_max"], "tono": r["tono"], "icono": r["icono"],
+            "subcategoria": r["sub_category"], "precio": p_orig, "precio_final": p_fin,
+            "descuento": p_desc, "descuento_general": desc_gen, "descuento_efectivo": efectivo,
+            "vendidos": r["vendidos"],
+            "descuento_max": max(r["descuento_max"] or 0, round(efectivo / 100.0, 2)),
+            "tono": r["tono"], "icono": r["icono"],
             "marca": r["marca"], "descripcion": r["descripcion"], "ficha": _deserializar_ficha(r["ficha"]),
             "stock": r["stock"] if r["stock"] <= STOCK_AVISO else None,
             "stock_nivel": nivel_stock(r["stock"])
@@ -559,7 +602,7 @@ def create_app(config=None):
 
     @app.get("/tienda/config")
     def tienda_config():
-        return jsonify({"monedas": ["USD", "COP"], "tasa_cop": app.config["TASA_COP"]})
+        return jsonify({"monedas": ["USD", "COP"], "tasa_cop": app.config["TASA_COP"], "descuento_general": _descuento_general()})
 
     # ------------------------------------------------------------ cuentas de cliente (tienda)
     intentos = {}                                   # (ip, correo) -> momentos de intentos fallidos
@@ -571,7 +614,8 @@ def create_app(config=None):
     def _ahora():
         return datetime.now().isoformat(timespec="seconds")
 
-    def _abrir_sesion(cuenta_id, respuesta):
+    def _abrir_sesion(cuenta_id, respuesta, admin=False):
+        """Abre la sesión en la cookie de su tipo: así entrar como admin no cierra la sesión del cliente (ni al revés)."""
         conn = db()
         conn.execute("DELETE FROM sesiones WHERE expira < ?", (_ahora(),))   # limpieza
         token = secrets.token_urlsafe(32)
@@ -579,18 +623,34 @@ def create_app(config=None):
         conn.execute("INSERT INTO sesiones (token_hash, cuenta_id, expira) VALUES (?,?,?)",
                      (_hash_token(token), cuenta_id, expira))
         seguro = request.is_secure or request.headers.get("X-Forwarded-Proto") == "https"
-        respuesta.set_cookie(COOKIE_SESION, token, max_age=DURACION_SESION,
+        respuesta.set_cookie(COOKIE_SESION_ADMIN if admin else COOKIE_SESION, token, max_age=DURACION_SESION,
                              httponly=True, samesite="Lax", secure=seguro)
         return respuesta
 
-    def _cuenta_actual():
-        token = request.cookies.get(COOKIE_SESION)
+    def _cuenta_de_sesion(cookie, rol):
+        """La cuenta de la sesión guardada en esa cookie, solo si tiene el rol esperado (cliente o admin)."""
+        token = request.cookies.get(cookie)
         if not token:
             return None
         fila = db().execute(
             "SELECT c.*, s.expira FROM sesiones s JOIN cuentas c ON c.id = s.cuenta_id "
-            "WHERE s.token_hash = ?", (_hash_token(token),)).fetchone()
+            "WHERE s.token_hash = ? AND c.rol = ?", (_hash_token(token), rol)).fetchone()
         return fila if fila and fila["expira"] >= _ahora() else None
+
+    def _cuenta_actual():
+        """El cliente con sesión en la tienda. Una sesión de administrador no cuenta aquí."""
+        return _cuenta_de_sesion(COOKIE_SESION, "cliente")
+
+    def _admin_actual():
+        """El administrador con sesión. Una sesión de cliente no cuenta aquí."""
+        return _cuenta_de_sesion(COOKIE_SESION_ADMIN, "admin")
+
+    def _cerrar_sesion(cookie, respuesta):
+        token = request.cookies.get(cookie)
+        if token:
+            db().execute("DELETE FROM sesiones WHERE token_hash = ?", (_hash_token(token),))
+        respuesta.delete_cookie(cookie, samesite="Lax")
+        return respuesta
 
     def _texto_cuenta(datos, campo):
         valor = datos.get(campo)
@@ -685,12 +745,13 @@ def create_app(config=None):
         recientes = _frenar_si_abusa(llave)
         fila = db().execute("SELECT * FROM cuentas WHERE email = ?", (email,)).fetchone()
         correcta = check_password_hash(fila["password_hash"] if fila else hash_falso, clave)
-        # Mismo mensaje si el correo no existe, la clave falla o la cuenta no es de admin: no se filtra cuál fue.
-        if not fila or not correcta or (solo_admin and fila["rol"] != "admin"):
+        # Mismo mensaje si el correo no existe, la clave falla o la cuenta no es del tipo de este formulario
+        # (la tienda solo recibe clientes y el panel solo administradores): no se filtra cuál fue.
+        if not fila or not correcta or (fila["rol"] == "admin") != solo_admin:
             intentos[llave] = recientes + [time.time()]
             raise ErrorApi(401, "Correo o contraseña incorrectos")
         intentos.pop(llave, None)
-        return _abrir_sesion(fila["id"], jsonify(_perfil(fila)))
+        return _abrir_sesion(fila["id"], jsonify(_perfil(fila)), admin=solo_admin)
 
     @app.get("/tienda/ubicaciones")
     def tienda_ubicaciones():
@@ -720,9 +781,9 @@ def create_app(config=None):
     def _cuenta_cliente():
         cuenta = _cuenta_actual()
         if not cuenta:
+            if _admin_actual():
+                raise ErrorApi(403, "Los pedidos de la tienda son solo para cuentas de cliente")
             raise ErrorApi(401, "Inicia sesión para continuar con tu compra")
-        if cuenta["rol"] != "cliente":
-            raise ErrorApi(403, "Los pedidos de la tienda son solo para cuentas de cliente")
         return cuenta
 
     def _armar_compra(datos):
@@ -735,6 +796,7 @@ def create_app(config=None):
         if not isinstance(items, list) or not 1 <= len(items) <= 100:
             raise ErrorApi(422, "El carrito debe tener entre 1 y 100 productos")
         conn = db()
+        desc_gen = _descuento_general(conn)
         lineas, errores, vistos = [], [], set()
         for n, it in enumerate(items, 1):
             if not isinstance(it, dict):
@@ -747,7 +809,8 @@ def create_app(config=None):
                 continue
             vistos.add((pid, nom))
             f = conn.execute("""
-                SELECT p.stock, COALESCE(p.precio, (SELECT ROUND(AVG(d.sales / (d.quantity * (1 - d.discount))), 2)
+                SELECT p.stock, COALESCE(p.descuento, 0) AS descuento,
+                       COALESCE(p.precio, (SELECT ROUND(AVG(d.sales / (d.quantity * (1 - d.discount))), 2)
                        FROM detalle_pedido d WHERE d.product_id = p.product_id AND d.product_name = p.product_name)) AS precio
                 FROM productos p WHERE p.product_id = ? AND p.product_name = ? AND p.activo = 1""",
                 (pid, nom)).fetchone()
@@ -757,7 +820,9 @@ def create_app(config=None):
             if f["stock"] < cant:
                 errores.append(f"{nom}: solo quedan {f['stock']} unidades")
                 continue
-            lineas.append((pid, nom, round(f["precio"] * cant, 2), cant))
+            desc_efectivo = max(float(f["descuento"] or 0), desc_gen)
+            unitario = round(f["precio"] * (1.0 - desc_efectivo / 100.0), 2)
+            lineas.append((pid, nom, round(unitario * cant, 2), cant, round(desc_efectivo / 100.0, 2)))
         if errores:
             raise ErrorApi(422, "No se pudo confirmar el pedido", errores)
         subtotal_cop = round(sum(l[2] for l in lineas) * app.config["TASA_COP"])
@@ -843,9 +908,9 @@ def create_app(config=None):
                          (order_id, hoy, opcion["despacho"], MODO_POR_OPCION[opcion["id"]],
                           cid, _ahora(), opcion["costo_cop"],
                           dest_pais, dest_region, dest_ciudad, dest_direccion, dest_codigo_postal, dest_telefono))
-            for pid, nom, ventas, cant in compra["lineas"]:
+            for pid, nom, ventas, cant, dto in compra["lineas"]:
                 conn.execute("INSERT INTO detalle_pedido (order_id, product_id, product_name, sales, quantity, "
-                             "discount, profit) VALUES (?,?,?,?,?,0,NULL)", (order_id, pid, nom, ventas, cant))
+                             "discount, profit) VALUES (?,?,?,?,?,?,NULL)", (order_id, pid, nom, ventas, cant, dto))
                 conn.execute("UPDATE productos SET stock = stock - ? WHERE product_id = ? AND product_name = ?",
                              (cant, pid, nom))          # el CHECK (stock >= 0) frena una venta doble
             usado = conn.execute("UPDATE pagos SET order_id = ? WHERE pago_id = ? AND order_id IS NULL "
@@ -992,20 +1057,41 @@ def create_app(config=None):
 
     @app.put("/cuenta/pedidos/<order_id>")
     def cuenta_pedido_modificar(order_id):
-        """Cambia las cantidades o quita productos, actualiza dirección/teléfono o cambia el tipo de envío
+        """Cambia las cantidades, agrega productos nuevos, actualiza dirección/teléfono o cambia el tipo de envío
         (dentro de la ventana). Todo es atómico. Si el costo de envío o productos baja, se reembolsa; si sube, da 409."""
         cuenta = _cuenta_cliente()
         datos = json_del_cuerpo()
         items = datos.get("items")
+        nuevos_productos = datos.get("nuevos_productos")
         destino_datos = datos.get("destino")
         opcion_envio_deseada = datos.get("opcion_envio") or (OPCION_POR_MODO.get(datos.get("modo_envio")) if datos.get("modo_envio") else None)
         telefono_dato = datos.get("telefono")
 
-        if items is None and destino_datos is None and opcion_envio_deseada is None and telefono_dato is None:
+        if items is None and nuevos_productos is None and destino_datos is None and opcion_envio_deseada is None and telefono_dato is None:
             raise ErrorApi(422, "No indicaste ningún cambio para el pedido")
 
         errores = []
         nuevas = {}
+        # Validar productos nuevos a agregar
+        agregar = []
+        if nuevos_productos is not None:
+            if not isinstance(nuevos_productos, list) or len(nuevos_productos) > 50:
+                raise ErrorApi(422, "nuevos_productos: envía una lista de productos a agregar (máx. 50)")
+            vistos_nuevos = set()
+            for n, np in enumerate(nuevos_productos, 1):
+                if not isinstance(np, dict):
+                    errores.append(f"nuevos_productos[{n}]: datos inválidos")
+                    continue
+                pid = np.get("product_id")
+                nom = np.get("product_name")
+                cant = np.get("quantity")
+                if (not isinstance(pid, str) or not isinstance(nom, str)
+                        or not isinstance(cant, int) or isinstance(cant, bool) or cant < 1 or cant > 99
+                        or (pid, nom) in vistos_nuevos):
+                    errores.append(f"nuevos_productos[{n}]: datos inválidos, repetidos o cantidad no válida")
+                    continue
+                vistos_nuevos.add((pid, nom))
+                agregar.append({"product_id": pid, "product_name": nom, "quantity": cant})
         if items is not None:
             if not isinstance(items, list) or len(items) > 100:
                 raise ErrorApi(422, "items: envía la lista de productos con su cantidad")
@@ -1081,6 +1167,34 @@ def create_app(config=None):
                                                  (order_id,)).fetchone()[0] * app.config["TASA_COP"])
                     reembolso_items = sub_cop_antes - sub_cop
 
+            # 1b. Agregar productos nuevos al pedido
+            costo_agregados = 0
+            if agregar:
+                claves_existentes = {(r["product_id"], r["product_name"]) for r in
+                                     conn.execute("SELECT product_id, product_name FROM detalle_pedido WHERE order_id = ?",
+                                                  (order_id,))}
+                for np_item in agregar:
+                    pid, nom, cant = np_item["product_id"], np_item["product_name"], np_item["quantity"]
+                    if (pid, nom) in claves_existentes:
+                        raise ErrorApi(422, f"{nom}: ese producto ya está en el pedido; usa 'items' para cambiar su cantidad")
+                    prod = conn.execute("""
+                        SELECT p.stock, COALESCE(p.precio, (SELECT ROUND(AVG(d.sales / (d.quantity * (1 - d.discount))), 2)
+                               FROM detalle_pedido d WHERE d.product_id = p.product_id AND d.product_name = p.product_name)) AS precio
+                        FROM productos p WHERE p.product_id = ? AND p.product_name = ? AND p.activo = 1""",
+                        (pid, nom)).fetchone()
+                    if not prod or prod["precio"] is None:
+                        raise ErrorApi(422, f"{nom}: producto no encontrado o no disponible")
+                    if prod["stock"] < cant:
+                        raise ErrorApi(422, f"{nom}: solo quedan {prod['stock']} unidades")
+                    ventas = round(prod["precio"] * cant, 2)
+                    conn.execute("INSERT INTO detalle_pedido (order_id, product_id, product_name, sales, quantity, "
+                                 "discount, profit) VALUES (?,?,?,?,?,0,NULL)", (order_id, pid, nom, ventas, cant))
+                    conn.execute("UPDATE productos SET stock = stock - ? WHERE product_id = ? AND product_name = ?",
+                                 (cant, pid, nom))
+                    costo_agregados += round(ventas * app.config["TASA_COP"])
+                    claves_existentes.add((pid, nom))
+                cambios += len(agregar)
+
             sub_cop_actual = round(conn.execute("SELECT SUM(sales) FROM detalle_pedido WHERE order_id = ?",
                                                 (order_id,)).fetchone()[0] * app.config["TASA_COP"])
 
@@ -1143,9 +1257,16 @@ def create_app(config=None):
                 raise ErrorApi(422, "No cambiaste nada en el pedido")
 
             reembolso_total = (reembolso_items or 0) + (reembolso_envio or 0)
-            if reembolso_total > 0:
-                conn.execute("UPDATE pagos SET monto_cop = monto_cop - ?, motivo = ? WHERE order_id = ?",
-                             (reembolso_total, f"Reembolso parcial por modificar el pedido: ${reembolso_total:,} COP".replace(",", "."),
+            # Si se agregaron productos, el costo sube: ajustar el pago
+            cargo_extra = costo_agregados if agregar else 0
+            ajuste_neto = cargo_extra - reembolso_total  # positivo = cobra más, negativo = reembolsa
+            if ajuste_neto > 0:
+                conn.execute("UPDATE pagos SET monto_cop = monto_cop + ?, motivo = ? WHERE order_id = ?",
+                             (ajuste_neto, f"Cargo adicional por productos agregados al pedido: ${ajuste_neto:,} COP".replace(",", "."),
+                              order_id))
+            elif ajuste_neto < 0:
+                conn.execute("UPDATE pagos SET monto_cop = monto_cop + ?, motivo = ? WHERE order_id = ?",
+                             (ajuste_neto, f"Reembolso parcial por modificar el pedido: ${-ajuste_neto:,} COP".replace(",", "."),
                               order_id))
 
             conn.execute("""
@@ -1162,7 +1283,9 @@ def create_app(config=None):
             conn.execute("ROLLBACK")
             raise
 
-        return jsonify({"mensaje": "Pedido actualizado", "reembolso_cop": reembolso_total,
+        return jsonify({"mensaje": "Pedido actualizado",
+                        "reembolso_cop": max(0, -ajuste_neto) if ajuste_neto < 0 else 0,
+                        "cargo_extra_cop": max(0, ajuste_neto) if ajuste_neto > 0 else 0,
                         "pedido": _pedido_json(conn, _pedido_de_la_cuenta(conn, cuenta, order_id))})
 
     @app.post("/cuenta/registro")
@@ -1202,9 +1325,9 @@ def create_app(config=None):
         No altera pedidos existentes ni expone datos sensibles en la auditoría."""
         cuenta = _cuenta_actual()
         if not cuenta:
+            if _admin_actual():              # un administrador con sesión no tiene perfil de cliente
+                raise ErrorApi(403, "Solo los clientes pueden editar su perfil")
             raise ErrorApi(401, "Inicia sesión para editar tu perfil")
-        if cuenta["rol"] != "cliente":
-            raise ErrorApi(403, "Solo los clientes pueden editar su perfil")
 
         datos = json_del_cuerpo()
         errores = []
@@ -1280,12 +1403,8 @@ def create_app(config=None):
 
     @app.post("/cuenta/salir")
     def cuenta_salir():
-        token = request.cookies.get(COOKIE_SESION)
-        if token:
-            db().execute("DELETE FROM sesiones WHERE token_hash = ?", (_hash_token(token),))
-        resp = jsonify({"mensaje": "Sesión cerrada"})
-        resp.delete_cookie(COOKIE_SESION, samesite="Lax")
-        return resp
+        """Cierra solo la sesión del cliente; si hay un administrador con sesión, sigue abierta."""
+        return _cerrar_sesion(COOKIE_SESION, jsonify({"mensaje": "Sesión cerrada"}))
 
     @app.get("/cuenta/yo")
     def cuenta_yo():
@@ -1296,11 +1415,11 @@ def create_app(config=None):
     # Un administrador es una cuenta con rol 'admin'. Para crearla hay que conocer el código de
     # administrador (el mismo valor de ADMIN_KEY): así nadie se hace admin solo desde la web.
     def requiere_admin():
-        c = _cuenta_actual()
+        c = _admin_actual()                 # solo cuenta la sesión de administrador, no la del cliente
         if not c:
+            if _cuenta_actual():            # hay un cliente con sesión, pero no es administrador
+                raise ErrorApi(403, "Esta sección es solo para administradores")
             raise ErrorApi(401, "Inicia sesión como administrador para continuar")
-        if c["rol"] != "admin":
-            raise ErrorApi(403, "Esta sección es solo para administradores")
         g.nivel = "admin"          # así la auditoría queda registrada como acción de administrador
         return c
 
@@ -1319,16 +1438,21 @@ def create_app(config=None):
         auditar(f"Nueva cuenta de administrador: {email}")
         resp = jsonify({"nombre": nombre, "email": email, "rol": "admin"})
         resp.status_code = 201
-        return _abrir_sesion(cuenta_id, resp)
+        return _abrir_sesion(cuenta_id, resp, admin=True)
 
     @app.post("/admin/entrar")
     def admin_entrar():
         return _iniciar_sesion(solo_admin=True)
 
+    @app.post("/admin/salir")
+    def admin_salir():
+        """Cierra solo la sesión del administrador; la del cliente en la tienda sigue abierta."""
+        return _cerrar_sesion(COOKIE_SESION_ADMIN, jsonify({"mensaje": "Sesión de administrador cerrada"}))
+
     @app.get("/admin/yo")
     def admin_yo():
-        c = _cuenta_actual()
-        return jsonify({"sesion": bool(c), "admin": bool(c and c["rol"] == "admin"),
+        c = _admin_actual()
+        return jsonify({"sesion": bool(c), "admin": bool(c),
                         "cuenta": {"nombre": c["nombre"], "email": c["email"]} if c else None})
 
     @app.get("/admin/catalogo/datos")
@@ -1472,6 +1596,17 @@ def create_app(config=None):
         marca = _texto(datos.get("marca"), "marca", errores, 120, obligatorio=False)
         descripcion = _texto(datos.get("descripcion"), "descripcion", errores, 2000, obligatorio=False)
         ficha_lista = _validar_ficha(datos.get("ficha"), errores)
+        descuento_raw = datos.get("descuento", 0)
+        if descuento_raw == "" or descuento_raw is None:
+            descuento = 0.0
+        else:
+            try:
+                descuento = round(float(descuento_raw), 2)
+                if not 0 <= descuento <= 100:
+                    errores.append("descuento: debe ser un porcentaje entre 0 y 100")
+            except (ValueError, TypeError):
+                errores.append("descuento: debe ser un número válido")
+                descuento = 0.0
         if errores:
             raise ErrorApi(422, "Datos inválidos", errores)
         if not db().execute("SELECT 1 FROM subcategorias WHERE categoria = ? AND nombre = ?",
@@ -1483,14 +1618,16 @@ def create_app(config=None):
         pid = "ME-P-" + secrets.token_hex(3).upper()
         ficha_json = json.dumps(ficha_lista, ensure_ascii=False) if ficha_lista else None
         try:
-            db().execute("INSERT INTO productos (product_id, product_name, category, sub_category, precio, stock, marca, descripcion, ficha) "
-                         "VALUES (?,?,?,?,?,?,?,?,?)",
-                         (pid, nombre, categoria, subcategoria, round(float(precio), 2), stock, marca, descripcion, ficha_json))
+            db().execute("INSERT INTO productos (product_id, product_name, category, sub_category, precio, stock, marca, descripcion, ficha, descuento) "
+                         "VALUES (?,?,?,?,?,?,?,?,?,?)",
+                         (pid, nombre, categoria, subcategoria, round(float(precio), 2), stock, marca, descripcion, ficha_json, descuento))
         except sqlite3.IntegrityError as e:
             raise ErrorApi(422, "La base de datos rechazó el producto", [str(e)])
         auditar(f"Producto creado: {pid} / {nombre} · stock inicial {stock} (por {cuenta['email']})")
+        precio_num = round(float(precio), 2)
         return jsonify({"product_id": pid, "nombre": nombre, "categoria": categoria, "subcategoria": subcategoria,
-                        "precio": round(float(precio), 2), "stock": stock,
+                        "precio": precio_num, "precio_final": round(precio_num * (1.0 - descuento / 100.0), 2),
+                        "descuento": descuento, "stock": stock,
                         "marca": marca, "descripcion": descripcion, "ficha": ficha_lista or [],
                         "mensaje": "Producto creado"}), 201
 
@@ -1512,7 +1649,7 @@ def create_app(config=None):
 
     CONSULTA_ADMIN = f"""
         SELECT p.product_id, p.product_name, p.category, p.sub_category, p.activo, p.stock,
-               p.marca, p.descripcion, p.ficha,
+               p.marca, p.descripcion, p.ficha, COALESCE(p.descuento, 0) AS descuento,
                p.precio AS precio_propio,
                COALESCE(p.precio, ROUND(AVG(d.sales / (d.quantity * (1 - d.discount))), 2)) AS precio,
                COALESCE(SUM(d.quantity), 0) AS vendidos, COUNT(d.detalle_id) AS lineas,
@@ -1520,8 +1657,12 @@ def create_app(config=None):
         {UNION_PRECIO} {{donde}} GROUP BY p.product_id, p.product_name, c.tono, s.icono"""
 
     def _json_producto_admin(r):
+        desc = float(r["descuento"] or 0)
+        p_base = r["precio"]
+        p_final = round(p_base * (1.0 - desc / 100.0), 2) if p_base is not None else None
         return {"product_id": r["product_id"], "nombre": r["product_name"], "categoria": r["category"],
-                "subcategoria": r["sub_category"], "precio": r["precio"],
+                "subcategoria": r["sub_category"], "precio": r["precio"], "precio_final": p_final,
+                "descuento": desc,
                 "precio_propio": r["precio_propio"] is not None,   # False = precio deducido del historial
                 "activo": bool(r["activo"]), "stock": r["stock"], "vendidos": r["vendidos"], "con_ventas": r["lineas"] > 0,
                 "tono": r["tono"], "icono": r["icono"],
@@ -1575,7 +1716,7 @@ def create_app(config=None):
         cuenta = requiere_admin()
         actual = _producto_de_ruta(product_id)
         datos = json_del_cuerpo()
-        campos = {"nombre", "categoria", "subcategoria", "precio", "activo", "stock", "ajuste_stock", "marca", "descripcion", "ficha"}
+        campos = {"nombre", "categoria", "subcategoria", "precio", "activo", "stock", "ajuste_stock", "marca", "descripcion", "ficha", "descuento"}
         errores = []
         if set(datos) - campos:
             errores.append(f"campos desconocidos: {sorted(set(datos) - campos)}")
@@ -1587,6 +1728,19 @@ def create_app(config=None):
         marca = actual["marca"]
         descripcion = actual["descripcion"]
         ficha_str = actual["ficha"]
+        descuento = actual["descuento"] if "descuento" in actual.keys() and actual["descuento"] is not None else 0
+        if "descuento" in datos:
+            d = datos["descuento"]
+            if d == "" or d is None:
+                descuento = 0.0
+            else:
+                try:
+                    descuento = round(float(d), 2)
+                    if not 0 <= descuento <= 100:
+                        errores.append("descuento: debe ser un porcentaje entre 0 y 100")
+                except (ValueError, TypeError):
+                    errores.append("descuento: debe ser un número válido")
+                    descuento = 0.0 # Valor seguro
         if "nombre" in datos:
             v = _texto(datos["nombre"], "nombre", errores, 200)
             if v is not None and len(v) < 2:
@@ -1651,6 +1805,10 @@ def create_app(config=None):
             ("precio", actual["precio"], precio), ("activo", actual["activo"], activo),
             ("stock", actual["stock"], nuevo_stock),
             ("marca", actual["marca"], marca)) if antes != ahora]
+        # `actual` es una fila de SQLite (no tiene .get): se lee con corchetes, y la columna puede faltar en bases viejas.
+        descuento_antes = round(float(actual["descuento"] or 0), 2) if "descuento" in actual.keys() else 0.0
+        if "descuento" in datos and descuento_antes != descuento:
+            cambios.append(f"descuento: {descuento_antes}% → {descuento}%")
         if "descripcion" in datos and descripcion != actual["descripcion"]:
             cambios.append("descripción actualizada")
         if "ficha" in datos and ficha_str != actual["ficha"]:
@@ -1668,11 +1826,11 @@ def create_app(config=None):
             # Un ajuste se aplica en la propia base (stock = stock + n): si dos admins ajustan a la vez, no se pisan.
             stock_sql = "stock + ?" if ajuste is not None else "?"
             conn.execute(f"UPDATE productos SET product_name = ?, category = ?, sub_category = ?, precio = ?, "
-                         f"activo = ?, stock = {stock_sql}, marca = ?, descripcion = ?, ficha = ? "
+                         f"activo = ?, stock = {stock_sql}, marca = ?, descripcion = ?, ficha = ?, descuento = ? "
                          f"WHERE product_id = ? AND product_name = ?",
                          (nombre, categoria, subcategoria, precio, activo,
                           ajuste if ajuste is not None else nuevo_stock,
-                          marca, descripcion, ficha_str, actual["product_id"], actual["product_name"]))
+                          marca, descripcion, ficha_str, descuento, actual["product_id"], actual["product_name"]))
             conn.execute("COMMIT")
         except sqlite3.IntegrityError as e:
             conn.execute("ROLLBACK")
@@ -1688,6 +1846,46 @@ def create_app(config=None):
         d["mensaje"] = "Producto actualizado" if cambios else "No había cambios que guardar"
         d["lineas_de_pedido_actualizadas"] = lineas
         return jsonify(d)
+
+    @app.post("/admin/catalogo/descuento-general")
+    def catalogo_descuento_general():
+        cuenta = requiere_admin()
+        datos = json_del_cuerpo()
+        d = datos.get("descuento")
+        
+        if d is None or d == "":
+            raise ErrorApi(422, "descuento: porcentaje requerido")
+            
+        try:
+            descuento = round(float(d), 2)
+        except (ValueError, TypeError):
+            raise ErrorApi(422, "descuento: debe ser un número válido")
+            
+        if not 0 <= descuento <= 100:
+            raise ErrorApi(422, "descuento: debe ser un porcentaje entre 0 y 100")
+        aplicar_a_productos = bool(datos.get("aplicar_a_productos", False))
+        categoria = datos.get("categoria")
+
+        conn = db()
+        conn.execute("INSERT OR REPLACE INTO configuracion (clave, valor) VALUES ('descuento_general', ?)",
+                     (str(descuento),))
+        filas = 0
+        if aplicar_a_productos:
+            if categoria:
+                c = conn.execute("UPDATE productos SET descuento = ? WHERE category = ? AND activo = 1",
+                                 (descuento, categoria))
+            else:
+                c = conn.execute("UPDATE productos SET descuento = ? WHERE activo = 1", (descuento,))
+            filas = c.rowcount
+            auditar(f"Descuento de {descuento}% aplicado a {filas} productos (por {cuenta['email']})")
+        else:
+            auditar(f"Descuento general fijado en {descuento}% (por {cuenta['email']})")
+
+        return jsonify({
+            "mensaje": f"Descuento general establecido en {descuento}%" + (f" y aplicado a {filas} productos" if aplicar_a_productos else ""),
+            "descuento_general": descuento,
+            "productos_afectados": filas
+        })
 
     @app.delete("/admin/catalogo/productos/<product_id>")
     def catalogo_producto_borrar(product_id):
@@ -1719,11 +1917,19 @@ def create_app(config=None):
 
     @app.get("/tienda/resumen")
     def tienda_resumen():
+        desc_gen = _descuento_general()
         f = db().execute("""SELECT (SELECT COUNT(*) FROM productos WHERE activo = 1) AS productos,
                                    (SELECT COUNT(*) FROM categorias) AS categorias,
                                    (SELECT COUNT(*) FROM pedidos WHERE cancelado_en IS NULL) AS pedidos,
-                                   (SELECT MAX(discount) FROM detalle_pedido) AS descuento_max""").fetchone()
-        return jsonify(dict(f))
+                                   (SELECT MAX(discount) FROM detalle_pedido) AS descuento_hist,
+                                   (SELECT MAX(descuento) FROM productos WHERE activo = 1) AS descuento_prod""").fetchone()
+        dto_max = max(float(f["descuento_hist"] or 0), float(f["descuento_prod"] or 0) / 100.0, desc_gen / 100.0)
+        return jsonify({
+            "productos": f["productos"],
+            "categorias": f["categorias"],
+            "pedidos": f["pedidos"],
+            "descuento_max": dto_max
+        })
 
     # ------------------------------------------------------------ general
     @app.get("/salud")
@@ -2076,10 +2282,14 @@ def create_app(config=None):
         datos = json_del_cuerpo()
         servicio = _servicio(datos.get("servicio_id"))
 
-        # ---- Validar motivo ----
+        # ---- Validar motivo según el servicio elegido ----
         motivo = datos.get("motivo")
-        if not motivo or not isinstance(motivo, str) or motivo not in MOTIVOS_TURNO:
+        if not motivo or not isinstance(motivo, str):
             raise ErrorApi(422, "Motivo inválido", ["motivo: elige una de las opciones permitidas"])
+        motivos_del_servicio = MOTIVOS_TURNO.get(servicio["nombre"], [])
+        if motivo not in motivos_del_servicio:
+            raise ErrorApi(400, "Motivo inválido para este servicio",
+                           ["motivo: elige una de las opciones permitidas para el servicio seleccionado"])
 
         # ---- Validar detalle (texto libre, máx. 500 caracteres, sin HTML) ----
         detalle_raw = datos.get("detalle")

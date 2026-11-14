@@ -366,7 +366,7 @@ def test_cuenta_de_cliente_no_puede_administrar_ni_entrar_como_admin(adm):
     app, cli = adm
     assert cli.post("/cuenta/registro", json=dict(CUENTA, email="cliente@example.com")).status_code == 201
     yo = cli.get("/admin/yo").get_json()
-    assert yo["sesion"] is True and yo["admin"] is False
+    assert yo["sesion"] is False and yo["admin"] is False
     assert cli.get("/admin/catalogo/datos").status_code == 403
     assert cli.post("/admin/catalogo/categorias", json={"nombre": "Hack"}).status_code == 403
     # entrar por la puerta de admin con una cuenta de cliente: mismo error genérico que una clave mala
@@ -382,7 +382,7 @@ def test_admin_entra_con_su_cuenta_y_sale(adm):
     assert nuevo.post("/admin/entrar", json={"email": ADM["email"], "password": "mala-clave-1"}).status_code == 401
     assert nuevo.post("/admin/entrar", json={"email": ADM["email"], "password": ADM["password"]}).status_code == 200
     assert nuevo.get("/admin/catalogo/datos").status_code == 200
-    nuevo.post("/cuenta/salir")
+    nuevo.post("/admin/salir")
     assert nuevo.get("/admin/catalogo/datos").status_code == 401
 
 
